@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dlg:window PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "dialog.dtd">
+<dlg:window xmlns:dlg="http://openoffice.org/2000/dialog" xmlns:script="http://openoffice.org/2000/script" dlg:id="ChartOptionsDialog" dlg:left="209" dlg:top="161" dlg:width="260" dlg:height="254" dlg:closeable="true" dlg:moveable="true" dlg:title="Επιλογές Απεικόνισης Οργανογράμματος">
+ <dlg:styles>
+  <dlg:style dlg:style-id="0" dlg:border="simple"/>
+ </dlg:styles>
+ <dlg:bulletinboard>
+  <dlg:titledbox dlg:id="PageSizeGroup" dlg:tab-index="0" dlg:left="133" dlg:top="26" dlg:width="121" dlg:height="58">
+   <dlg:title dlg:value="Ιδιότητες Σελίδας"/>
+  </dlg:titledbox>
+  <dlg:text dlg:id="Label1" dlg:tab-index="3" dlg:left="136" dlg:top="55" dlg:width="50" dlg:height="12" dlg:value="Μήκος (1/100 mm)"/>
+  <dlg:text dlg:id="Label2" dlg:tab-index="4" dlg:left="136" dlg:top="68" dlg:width="50" dlg:height="10" dlg:value="Ύψος (1/100 mm)"/>
+  <dlg:titledbox dlg:id="FrameControl1" dlg:tab-index="5" dlg:left="132" dlg:top="87" dlg:width="121" dlg:height="92">
+   <dlg:title dlg:value="Ιδιότητες Κόμβων"/>
+  </dlg:titledbox>
+  <dlg:text dlg:id="Label3" dlg:tab-index="8" dlg:left="136" dlg:top="98" dlg:width="50" dlg:height="12" dlg:value="Μήκος (1/100 mm)"/>
+  <dlg:text dlg:id="Label4" dlg:tab-index="9" dlg:left="136" dlg:top="113" dlg:width="50" dlg:height="10" dlg:value="Ύψος (1/100 mm)"/>
+  <dlg:titledbox dlg:id="FrameControl2" dlg:tab-index="12" dlg:left="6" dlg:top="26" dlg:width="121" dlg:height="38">
+   <dlg:title dlg:value="Απεικόνιση Σχέσεων"/>
+  </dlg:titledbox>
+  <dlg:numericfield dlg:id="OptionPageWidth" dlg:tab-index="1" dlg:left="193" dlg:top="52" dlg:width="55" dlg:height="12" dlg:help-text="Μήκος σελίδας σε εκατοστά του χιλιοστού" dlg:decimal-accuracy="0"/>
+  <dlg:numericfield dlg:id="OptionPageHeight" dlg:tab-index="2" dlg:left="193" dlg:top="66" dlg:width="55" dlg:height="12" dlg:help-text="Ύψος σελίδας σε εκατοστά του χιλιοστού" dlg:decimal-accuracy="0"/>
+  <dlg:numericfield dlg:id="OptionNodeWidth" dlg:tab-index="6" dlg:left="193" dlg:top="97" dlg:width="55" dlg:height="12" dlg:help-text="Μήκος Θέσης, Οργανικής Μονάδας, Προσώπου σε εκατοστά του χιλιοστού" dlg:decimal-accuracy="0"/>
+  <dlg:numericfield dlg:id="OptionNodeHeight" dlg:tab-index="7" dlg:left="193" dlg:top="111" dlg:width="55" dlg:height="12" dlg:help-text="Ύψος Θέσης, Οργανικής Μονάδας, Προσώπου σε εκατοστά του χιλιοστού" dlg:decimal-accuracy="0"/>
+  <dlg:checkbox dlg:id="OptionBelongsTo" dlg:tab-index="10" dlg:left="11" dlg:top="39" dlg:width="107" dlg:height="10" dlg:value="Σχεδίαση σχέσης &quot;Ανήκει σε&quot;" dlg:checked="false"/>
+  <dlg:checkbox dlg:id="OptionRefersTo" dlg:tab-index="11" dlg:left="11" dlg:top="50" dlg:width="107" dlg:height="10" dlg:value="Σχεδίαση σχέσης &quot;Αναφέρεται σε&quot;" dlg:checked="false"/>
+  <dlg:button dlg:id="OptionOkButton" dlg:tab-index="13" dlg:left="177" dlg:top="230" dlg:width="37" dlg:height="15" dlg:value="Εντάξει" dlg:button-type="ok"/>
+  <dlg:button dlg:id="OptionCancelButton" dlg:tab-index="14" dlg:left="218" dlg:top="230" dlg:width="37" dlg:height="15" dlg:value="Ακύρωση" dlg:button-type="cancel"/>
+  <dlg:titledbox dlg:id="FrameControl3" dlg:tab-index="15" dlg:left="132" dlg:top="181" dlg:width="121" dlg:height="42">
+   <dlg:title dlg:value="Ιδιότητες Κειμένου"/>
+  </dlg:titledbox>
+  <dlg:text dlg:id="Label5" dlg:tab-index="17" dlg:left="136" dlg:top="209" dlg:width="67" dlg:height="9" dlg:value="Μέγεθος Γραμματοσειράς"/>
+  <dlg:text dlg:id="Label6" dlg:tab-index="18" dlg:left="136" dlg:top="193" dlg:width="45" dlg:height="9" dlg:value="Γραμματοσειρά"/>
+  <dlg:numericfield dlg:id="OptionFontSize" dlg:tab-index="16" dlg:left="208" dlg:top="207" dlg:width="41" dlg:height="12" dlg:help-text="Επιλογή μεγέθους γραμματοσειράς κειμένου των κόμβων" dlg:decimal-accuracy="0"/>
+  <dlg:combobox dlg:id="OptionFontList" dlg:tab-index="19" dlg:left="186" dlg:top="193" dlg:width="62" dlg:height="12" dlg:help-text="Επιλογή γραμματοσειράς κειμένου των κόμβων" dlg:hide-inactive-selection="false" dlg:spin="true" dlg:linecount="7"/>
+  <dlg:titledbox dlg:id="FrameControl4" dlg:tab-index="20" dlg:left="6" dlg:top="66" dlg:width="121" dlg:height="55">
+   <dlg:title dlg:value="Σχεδίαση Οντοτήτων"/>
+  </dlg:titledbox>
+  <dlg:radiogroup>
+   <dlg:radio dlg:id="OptionNoPersons" dlg:tab-index="22" dlg:left="13" dlg:top="88" dlg:width="105" dlg:height="9" dlg:help-text="Το οργανόγραμμα θα σταματάει στις Θέσεις" dlg:value="Να μη σχεδιαστούν πρόσωπα"/>
+   <dlg:radio dlg:id="OptionPositionOwnsPerson" dlg:tab-index="23" dlg:left="13" dlg:top="99" dlg:width="105" dlg:height="9" dlg:help-text="Στην περίτπωση πολυθεσίτη,  ξεχωριστό αντίτυπο του Προσώπου συνδέεται με κάθε Θέση που καταλαμβάνει" dlg:value="Ένα πρόσωπο για μία θέση"/>
+   <dlg:radio dlg:id="OptionNotPositionOwnsPerson" dlg:tab-index="24" dlg:left="13" dlg:top="110" dlg:width="112" dlg:height="7" dlg:help-text="Στην περίτπωση πολυθεσίτη,  το Πρόσωπο συνδέεται με κάθε Θέση που καταλαμβάνει" dlg:value="Ένα πρόσωπο για περισσότερες θέσεις"/>
+  </dlg:radiogroup>
+  <dlg:combobox dlg:id="OptionOrganisationUnitToDraw" dlg:tab-index="25" dlg:left="130" dlg:top="6" dlg:width="118" dlg:height="12" dlg:help-text="Επιλέξτε από τη λίστα την Οργανική μονάδα ή τον Οργανισμό για την απεικόνιση του Οργανογράμματος" dlg:spin="true" dlg:linecount="7"/>
+  <dlg:text dlg:id="Label7" dlg:tab-index="26" dlg:left="8" dlg:top="7" dlg:width="116" dlg:height="9" dlg:help-text="Επιλέξτε από τη λίστα την Οργανική μονάδα ή τον Οργανισμό για την απεικόνιση του Οργανογράμματος" dlg:value="Οργανική Μονάδα για απεικόνιση" dlg:align="right"/>
+  <dlg:titledbox dlg:id="FrameControl5" dlg:tab-index="27" dlg:left="6" dlg:top="123" dlg:width="121" dlg:height="83">
+   <dlg:title dlg:value="&quot;Ωραιοποίηση&quot;  Διαγράμματος"/>
+  </dlg:titledbox>
+  <dlg:numericfield dlg:id="OptionDrawingBeautificationEnergyThreshold" dlg:tab-index="29" dlg:left="91" dlg:top="147" dlg:width="29" dlg:height="12" dlg:decimal-accuracy="0" dlg:value-min="0"/>
+  <dlg:checkbox dlg:id="OptionDrawingBeautification" dlg:tab-index="28" dlg:left="11" dlg:top="133" dlg:width="109" dlg:height="9" dlg:value="Ενεργοποίηση (Πειραματική λειτουργία)" dlg:checked="false">
+   <script:event script:event-name="on-itemstatechange" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.ActivateDeactivateBeautificationControls?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:checkbox>
+  <dlg:numericfield dlg:id="OptionDrawingBeautificationCoefficientK" dlg:tab-index="31" dlg:left="91" dlg:top="162" dlg:width="29" dlg:height="12" dlg:value-min="0" dlg:value-max="100"/>
+  <dlg:numericfield dlg:id="OptionDrawingBeautificationCoefficientC" dlg:tab-index="33" dlg:left="91" dlg:top="175" dlg:width="29" dlg:height="13" dlg:value-min="0" dlg:value-max="100"/>
+  <dlg:numericfield dlg:id="OptionDrawingBeautificationDumping" dlg:tab-index="35" dlg:left="91" dlg:top="189" dlg:width="29" dlg:height="12" dlg:value-min="0" dlg:value-max="1" dlg:value-step="0"/>
+  <dlg:text dlg:id="OptionDrawingBeautificationEnergyThresholdLabel" dlg:tab-index="30" dlg:left="18" dlg:top="149" dlg:width="70" dlg:height="9" dlg:value="Κατώφλι τερματισμού"/>
+  <dlg:text dlg:id="OptionDrawingBeautificationCoefficientCLabel" dlg:tab-index="34" dlg:left="18" dlg:top="177" dlg:width="70" dlg:height="9" dlg:value="Συντελεστής Απώθησης C"/>
+  <dlg:text dlg:id="OptionDrawingBeautificationCoefficientKLabel" dlg:tab-index="32" dlg:left="18" dlg:top="164" dlg:width="70" dlg:height="9" dlg:value="Συντελεστής Έλξης Κ"/>
+  <dlg:text dlg:id="OptionDrawingBeautificationDumpingLabel" dlg:tab-index="36" dlg:left="18" dlg:top="190" dlg:width="70" dlg:height="9" dlg:value="Συντελεστής επιβράδυνσης"/>
+  <dlg:text dlg:id="Label8" dlg:tab-index="38" dlg:left="136" dlg:top="39" dlg:width="50" dlg:height="9" dlg:value="Μέγεθος"/>
+  <dlg:combobox dlg:id="OptionPageSizeList" dlg:tab-index="37" dlg:left="193" dlg:top="39" dlg:width="56" dlg:height="12" dlg:spin="true">
+   <dlg:menupopup>
+    <dlg:menuitem dlg:value="A4,A5,A6"/>
+   </dlg:menupopup>
+   <script:event script:event-name="on-textchange" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.ChangePageSize?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:combobox>
+  <dlg:text dlg:id="Label9" dlg:tab-index="39" dlg:left="136" dlg:top="127" dlg:width="82" dlg:height="10" dlg:value="Χρώμα φόντου Οργ.Μονάδων"/>
+  <dlg:text dlg:id="Label10" dlg:tab-index="40" dlg:left="136" dlg:top="144" dlg:width="82" dlg:height="10" dlg:value="Χρώμα φόντου Θέσεων"/>
+  <dlg:text dlg:id="Label11" dlg:tab-index="41" dlg:left="136" dlg:top="162" dlg:width="82" dlg:height="10" dlg:value="Χρώμα φόντου Προσώπων"/>
+  <dlg:titledbox dlg:id="FrameControl6" dlg:tab-index="42" dlg:left="6" dlg:top="210" dlg:width="121" dlg:height="37">
+   <dlg:title dlg:value="Απεικόνιση ως..."/>
+  </dlg:titledbox>
+  <dlg:radiogroup>
+   <dlg:radio dlg:id="OptionRenderAsDrawDocument" dlg:tab-index="43" dlg:left="14" dlg:top="223" dlg:width="105" dlg:height="9" dlg:help-text="Το οργανόγραμμα θα σταματάει στις Θέσεις" dlg:value="Έγγραφο Open Draw"/>
+   <dlg:radio dlg:id="OptionRenderAsDotFile" dlg:tab-index="44" dlg:left="14" dlg:top="234" dlg:width="105" dlg:height="9" dlg:help-text="Στην περίτπωση πολυθεσίτη,  ξεχωριστό αντίτυπο του Προσώπου συνδέεται με κάθε Θέση που καταλαμβάνει" dlg:value="Αρχείο σχεδίασης γράφου .dot"/>
+   <dlg:radio dlg:id="OptionNoPositionsPersons" dlg:tab-index="21" dlg:left="13" dlg:top="77" dlg:width="108" dlg:height="9" dlg:help-text="Σχεδιάζονται μόνο οργ.μονάδες, οι οποίες περιέχουν τις θέσεις και τα πρόσωπα που τις καταλαμβάνουν" dlg:tabstop="true" dlg:value="Συγχώνευση θέσεων και προσώπων"/>
+  </dlg:radiogroup>
+  <dlg:text dlg:style-id="0" dlg:id="OptionOrgUnitColor" dlg:tab-index="45" dlg:left="218" dlg:top="127" dlg:width="29" dlg:height="13">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.InitializeColorPickerDialog?language=Basic&amp;location=document" script:language="Script"/>
+   <script:event script:event-name="on-keydown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.InitializeColorPickerDialog?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:text>
+  <dlg:text dlg:style-id="0" dlg:id="OptionPositionColor" dlg:tab-index="46" dlg:left="218" dlg:top="144" dlg:width="29" dlg:height="13">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.InitializeColorPickerDialog?language=Basic&amp;location=document" script:language="Script"/>
+   <script:event script:event-name="on-keydown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.InitializeColorPickerDialog?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:text>
+  <dlg:text dlg:style-id="0" dlg:id="OptionPersonColor" dlg:tab-index="47" dlg:left="218" dlg:top="162" dlg:width="29" dlg:height="13">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.InitializeColorPickerDialog?language=Basic&amp;location=document" script:language="Script"/>
+   <script:event script:event-name="on-keydown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.InitializeColorPickerDialog?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:text>
+ </dlg:bulletinboard>
+</dlg:window>

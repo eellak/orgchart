@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dlg:window PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "dialog.dtd">
+<dlg:window xmlns:dlg="http://openoffice.org/2000/dialog" xmlns:script="http://openoffice.org/2000/script" dlg:id="MultiValueContainerDialog" dlg:left="120" dlg:top="130" dlg:width="233" dlg:height="158" dlg:page="2" dlg:closeable="true" dlg:moveable="true" dlg:title="Διαχείριση Πολλαπλών Τιμών">
+ <dlg:styles>
+  <dlg:style dlg:style-id="0" dlg:font-height="13" dlg:font-weight="150"/>
+  <dlg:style dlg:style-id="1" dlg:font-height="12" dlg:font-weight="150"/>
+  <dlg:style dlg:style-id="2" dlg:border="none"/>
+  <dlg:style dlg:style-id="3" dlg:font-name="Wingdings" dlg:font-height="12" dlg:font-stylename="Regular" dlg:font-charset="symbol"/>
+  <dlg:style dlg:style-id="4" dlg:font-name="Wingdings" dlg:font-height="12" dlg:font-stylename="Regular" dlg:font-charset="symbol"/>
+ </dlg:styles>
+ <dlg:bulletinboard>
+  <dlg:text dlg:id="EntityName" dlg:tab-index="0" dlg:left="3" dlg:top="12" dlg:width="74" dlg:height="9" dlg:value="Label1"/>
+  <dlg:textfield dlg:id="EntityInstanceName" dlg:tab-index="11" dlg:left="3" dlg:top="24" dlg:width="87" dlg:height="12" dlg:tabstop="false" dlg:hide-inactive-selection="false" dlg:readonly="true"/>
+  <dlg:text dlg:id="ColumnHeaderName" dlg:tab-index="12" dlg:left="140" dlg:top="28" dlg:width="71" dlg:height="9" dlg:value="Label1" dlg:align="center"/>
+  <dlg:textfield dlg:id="ColumnValue" dlg:tab-index="1" dlg:left="9" dlg:top="90" dlg:width="85" dlg:height="12" dlg:page="1">
+   <script:event script:event-name="on-keyup" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.KeyPressedOnColumnValue?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:button dlg:style-id="0" dlg:id="PreviousColumn" dlg:tab-index="9" dlg:left="123" dlg:top="25" dlg:width="14" dlg:height="14" dlg:help-text="Προηγούμενη στήλη" dlg:value="&lt;" dlg:image-position="left-top" dlg:image-align="left">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.PreviousColumn?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:style-id="0" dlg:id="NextColumn" dlg:tab-index="10" dlg:left="214" dlg:top="25" dlg:width="12" dlg:height="14" dlg:help-text="Επόμενη στήλη" dlg:value="&gt;" dlg:image-position="left-top" dlg:image-align="left">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.NextColumn?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="CancelButton" dlg:tab-index="6" dlg:left="183" dlg:top="135" dlg:width="48" dlg:height="16" dlg:value="Ακύρωση" dlg:button-type="cancel"/>
+  <dlg:button dlg:id="OKButton" dlg:tab-index="5" dlg:left="130" dlg:top="135" dlg:width="48" dlg:height="16" dlg:value="Εντάξει" dlg:button-type="ok"/>
+  <dlg:menulist dlg:id="ColumnValues" dlg:tab-index="3" dlg:left="123" dlg:top="40" dlg:width="104" dlg:height="87"/>
+  <dlg:button dlg:style-id="1" dlg:id="InsertValue" dlg:tab-index="2" dlg:left="95" dlg:top="74" dlg:width="18" dlg:height="21" dlg:help-text="Πρόσθεση στην δεξιά λίστα" dlg:value="+ &gt;">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.InsertColumnValueInColumnValues?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:style-id="1" dlg:id="EditValue" dlg:tab-index="4" dlg:left="102" dlg:top="96" dlg:width="18" dlg:height="20" dlg:help-text="Αφαίρεση από τη δεξιά λίστα για διόρθωση" dlg:value="&lt; -">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.ModifySelectedColumnValue?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+  <dlg:numericfield dlg:style-id="2" dlg:id="SelectedColumn" dlg:tab-index="14" dlg:left="-24" dlg:top="148" dlg:width="20" dlg:height="12" dlg:printable="false" dlg:readonly="true" dlg:decimal-accuracy="0" dlg:value="-1"/>
+  <dlg:numericfield dlg:style-id="2" dlg:id="SelectedRow" dlg:tab-index="13" dlg:left="-24" dlg:top="136" dlg:width="20" dlg:height="12" dlg:printable="false" dlg:readonly="true" dlg:decimal-accuracy="0" dlg:value="-1"/>
+  <dlg:button dlg:style-id="3" dlg:id="CommandButton1" dlg:tab-index="7" dlg:left="80" dlg:top="6" dlg:width="16" dlg:height="16" dlg:help-text="Προηγούμενη γραμμή" dlg:value="">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.PreviousRow?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:style-id="4" dlg:id="CommandButton2" dlg:tab-index="8" dlg:left="94" dlg:top="26" dlg:width="16" dlg:height="16" dlg:help-text="Επόμενη γραμμή" dlg:value="">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.NextRow?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+  <dlg:combobox dlg:id="ColumnValueCombo" dlg:tab-index="15" dlg:left="9" dlg:top="90" dlg:width="85" dlg:height="12" dlg:page="2" dlg:spin="true"/>
+  <dlg:titledbox dlg:id="FrameControl1" dlg:tab-index="16" dlg:left="7" dlg:top="67" dlg:width="114" dlg:height="56">
+   <dlg:title dlg:value="Διόρθωση/Εισαγωγή:"/>
+  </dlg:titledbox>
+  <dlg:fixedline dlg:id="FixedLine1" dlg:tab-index="17" dlg:left="3" dlg:top="54" dlg:width="118" dlg:height="8"/>
+ </dlg:bulletinboard>
+</dlg:window>

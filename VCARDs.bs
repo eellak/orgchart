@@ -1,0 +1,933 @@
+REM  *****  BASIC  *****
+REM Developer of this Basic module: Elias Kalapanidas
+REM and sole responsible for the mess in the code
+
+'Some private variables with module-wide scope
+'VCARD Vocabulary
+Private VC_URL(0) As String
+Private VC_Phone(0) As String
+Private VC_Profession(0) As String
+Private VC_POBox(0) As String
+Private VC_Street(0) As String
+Private VC_PostalCode(0) As String
+Private VC_Location(0) As String
+Private VC_Region(0) As String
+Private VC_Country(0) As String
+Private VC_Email(0) As String
+Private VC_Cellphone(0) As String
+Private VC_Fax(0) As String
+
+
+Type VCARDType
+	hasOpened As Boolean
+	hasClosed As Boolean
+	version As String
+	firstName As String
+	lastName As String
+	formattedName As String
+	revision As String
+	
+	homePhone As String
+	homeCellPhone As String
+	homeFax As String
+	homeEmail As String
+	homeURL As String
+	homeAddressPOBox As String
+	homeAddressExtended As String
+	homeAddressStreet As String
+	homeAddressLocality As String
+	homeAddressRegion As String
+	homeAddressPCode As String
+	homeAddressCountry As String
+	homeLabel As String
+
+	organisationName As String
+	organisationUnit As String
+	organisationRole As String
+	profession As String
+
+	workPhone As String
+	workCellPhone As String
+	workFax As String
+	workEmail As String
+	workURL As String
+	workAddressPOBox As String
+	workAddressExtended As String
+	workAddressStreet As String
+	workAddressLocality As String
+	workAddressRegion As String
+	workAddressPCode As String
+	workAddressCountry As String
+	workLabel As String
+End Type
+
+Sub InitializeVocabulary
+	'VCARD Vocabulary
+	ReDim Preserve VC_URL(6) As String
+	ReDim Preserve VC_Phone(3) As String
+	ReDim Preserve VC_Profession(1) As String
+	ReDim Preserve VC_POBox(3) As String
+	ReDim Preserve VC_Street(3) As String
+	ReDim Preserve VC_PostalCode(4) As String
+	ReDim Preserve VC_Location(5) As String
+	ReDim Preserve VC_Region(1) As String
+	ReDim Preserve VC_Country(1) As String
+	ReDim Preserve VC_Email(3) As String
+	ReDim Preserve VC_Cellphone(5) As String
+	ReDim Preserve VC_Fax(5) As String
+	
+	VC_URL = array( "Web", "WEB", "Site", "SITE", "URL", "Ιστοσελίδα", "ΙΣΤΟΣΕΛΙΔΑ" )
+	VC_Phone = array( "Τηλέφωνο", "ΤΗΛΕΦΩΝΟ", "Τηλ.", "ΤΗΛ." )
+	VC_Profession = array( "Επάγγελμα", "ΕΠΑΓΓΕΛΜΑ" )
+	VC_POBox = array( "Θυρίδα", "ΘΥΡΙΔΑ", "Τ.Θ.", "Ταχυδρομική Θυρίδα" )
+	VC_Street = array( "Οδός", "ΟΔΟΣ", "Διεύθυνση", "ΔΙΕΥΘΥΝΣΗ" )
+	VC_PostalCode = array( "ΤΚ", "Τ.Κ.", "Ταχυδρομικός Κωδικός", "Κωδικός", "ΚΩΔΙΚΟΣ" )
+	VC_Location = array( "Περιοχή", "ΠΕΡΙΟΧΗ", "Δήμος", "ΔΗΜΟΣ", "Κοινότητα", "ΚΟΙΝΟΤΗΤΑ" )
+	VC_Region = array( "Νομός", "ΝΟΜΟΣ" )
+	VC_Country = array( "Χώρα", "ΧΩΡΑ" )
+	VC_Email = array( "email", "EMAIL", "e-mail", "E-MAIL" )
+	VC_Cellphone = array( "Κινητό", "ΚΙΝΗΤΟ", "Mobile", "MOBILE", "Cell", "CELL" )
+	VC_Fax = array( "Φάξ", "ΦΑΞ", "Fax", "FAX", "Τηλεομοιότυπο", "Τηλεομοιοτυπίας" )
+End Sub
+
+
+Sub ExportVCARD '(Person As Object)
+	Dim Sheet As Object, PositionsSheet As Object, OrgUnitsSheet As Object
+	Dim inputError As Boolean
+	
+	inputError = false
+	Sheet = ThisComponent.GetCurrentController.ActiveSheet	
+	selectedRow = GetSelectedRowStart(Sheet)
+	If NOT inputError AND Sheet.Name <> PERSONS_SHEETNAME Then
+		MsgBox "Παρακαλώ επιλέξτε πρόσωπο για εξαγωγή VCARD από το φύλλο εργασίας " & PERSONS_SHEET, 48, "Λανθασμένη Επιλογή"
+		inputError = true
+	End If		
+	'If  NOT inputError AND ( GetSelectedColumnStart(Sheet) > GetLastUsedColumn(Sheet) OR GetSelectedRowStart(Sheet) > GetLastUsedRow(Sheet) ) Then
+	If  NOT inputError AND GetSelectedRowStart(Sheet) > GetLastUsedRow(Sheet)  Then
+		MsgBox "Το κελί που επιλέξατε δεν αντιστοιχεί σε πρόσωπο του οποίου τα στοιχεία είναι συμπληρωμένα", 48, "Λανθασμένη Επιλογή"
+		inputError = true
+	End If
+	PositionsSheet = ThisComponent.Sheets.getByName(POSITIONS_SHEETNAME)
+	OrgUnitsSheet = ThisComponent.Sheets.getByName(ORGUNITS_SHEETNAME)
+	If NOT inputError AND IsNull(OrgUnitsSheet) Then	'Rule 1
+		inputError = true
+		MsgBox "Το φύλλο εργασίας " & ORGUNITS_SHEETNAME & " δε βρέθηκε", 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+	End If
+	If NOT inputError AND IsNull(PositionsSheet) Then	'Rule 2
+		inputError = true
+		MsgBox "Το φύλλο εργασίας " & POSITIONS_SHEETNAME & " δε βρέθηκε", 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+	End If
+	If NOT inputError AND ValidateOrganisationChartData = 0 Then
+		Dim fileName As String
+		'Print "Selected file: " + SelectFolder("C:", "Εξαγωγή VCARD ως ...")
+		fileName =  SelectFolder("", "Εξαγωγή VCARD ως ...") 
+		SavePersonVCARD(SelectedRow, fileName)
+	End If
+End Sub
+
+
+Sub SavePersonVCARD (SelectedRow As Long, fileName As String)
+	On Error Goto ErrorHandler
+	Dim Sheet As Object, PositionsSheet As Object, OrgUnitsSheet As Object
+	Dim inputError As Boolean
+	Dim Headers(2, 10) As String 'first dimension is the Sheet, second is the header column
+	Dim PersonData(2, 10) As String 'first dimension is the Sheet, second is the header column
+	Dim homePhone As String, homeAddress As String, homeEmail As String, homeURL As String, homeCellphone As String, homeFax As String
+	Dim workPhone As String, workAddress As String, workEmail As String, workURL As String, workCellphone As String, workFax As String
+	Dim personOrganisation As String, personProfession As String, personTitle As String
+	
+	Call InitializeVocabulary
+	
+	inputError = false
+
+	Sheet = ThisComponent.Sheets.getByName(PERSONS_SHEETNAME)
+	PositionsSheet = ThisComponent.Sheets.getByName(POSITIONS_SHEETNAME)
+	OrgUnitsSheet = ThisComponent.Sheets.getByName(ORGUNITS_SHEETNAME)
+
+		For i = 0 To GetLastUsedColumn(Sheet)
+			'Check whether Headers  array is large enough, otherwise increase its size
+			If UBound(Headers, 2) < i Then
+				ReDim Preserve Headers(2, i + 10 ) As String
+			End If
+			'Check whether PersonData  array is large enough, otherwise increase its size
+			If UBound(PersonData, 2) < i Then
+				ReDim Preserve PersonData(2, i + 10 ) As String
+			End If
+			Headers(0, i) = Sheet.getCellByPosition(i, 0).String
+			PersonData(0, i) = Sheet.getCellByPosition(i, SelectedRow).String
+		Next i
+		
+		'identify the VCARD fields from the header titles in PersonsSheet
+		For i = 3 To GetLastUsedColumn(Sheet)	'from 3 because columns 0,1,2 are reserved for id and name
+			If containsStringInArray( Headers(0, i), VC_Phone ) Then
+				homePhone = PersonData(0, i)
+			ElseIf containsStringInArray( Headers(0, i), VC_Profession ) Then
+				personProfession = PersonData(0, i)
+			ElseIf containsStringInArray( Headers(0, i), VC_URL ) Then
+				homeURL = PersonData(0, i)
+			ElseIf containsStringInArray( Headers(0, i), VC_Street ) Then
+				homeStreet = PersonData(0, i)
+			ElseIf containsStringInArray( Headers(0, i), VC_POBox ) Then
+				homePOBox = PersonData(0, i)
+			ElseIf containsStringInArray( Headers(0, i), VC_PostalCode ) Then
+				homePostalCode = PersonData(0, i)
+			ElseIf containsStringInArray( Headers(0, i), VC_Location ) Then
+				homeArea = PersonData(0, i)			
+			ElseIf containsStringInArray( Headers(0, i), VC_Region ) Then
+				homeRegion = PersonData(0, i)						
+			ElseIf containsStringInArray( Headers(0, i), VC_Country ) Then
+				homeCountry = PersonData(0, i)						
+			ElseIf containsStringInArray( Headers(0, i), VC_Email ) Then
+				homeEmail = PersonData(0, i)						
+			ElseIf containsStringInArray( Headers(0, i), VC_URL ) Then
+				homeURL = PersonData(0, i)						
+			ElseIf containsStringInArray( Headers(0, i), VC_Cellphone ) Then
+				homeCellphone = PersonData(0, i)						
+			ElseIf containsStringInArray( Headers(0, i), VC_Fax ) Then
+				homeFax = PersonData(0, i)						
+			End If
+		Next i	
+		personID = PersonData(0, 0) & ":" + PersonData(0, 1) & " " + PersonData(0, 2)
+		
+		'Position name is ROLE: positionName
+		PositionRows = GetLastUsedRow(PositionsSheet)
+		PositionColumns = GetLastUsedColumn(PositionsSheet)
+		personOrganisation = OrgUnitsSheet.getCellByPosition(1, 1).String
+		'Find PersonID in PositionSheet
+		
+		BelongsTo = PositionsSheet.GetCellRangeByPosition(3, HEADER_ROWS_PER_SHEET, 3, PositionRows)
+		Cell = SimpleSheetSearch( personID, BelongsTo, True )
+		'Avoid looping through all positions for the selected person until we know how to handle all positions data
+		'(different emails and urls and addresses for each position, while VCARD specifies only one)
+		If NOT IsNull(Cell) Then
+		'Do While NOT IsNull(Cell)
+			Dim CellRow As Integer
+			CellRow = Cell.CellAddress.Row
+			Cell = PositionsSheet.GetCellByPosition(1, CellRow)
+			If NOT IsEmpty(Cell) AND NOT IsNull(Cell) Then
+				personTitle = Cell.String
+			End If
+			Cell = PositionsSheet.GetCellByPosition(2, CellRow)
+			If NOT IsEmpty(Cell) AND NOT IsNull(Cell) Then
+				personOrganisation = personOrganisation & ";" & Cell.String 
+			End If			
+			'BelongsTo = PositionsSheet.GetCellRangeByPosition(3, Cell.CellAddress.Row+1, 3, PositionRows)
+			'Cell = SimpleSheetSearch( personID, BelongsTo, True )
+		
+			'identify the VCARD fields from the header titles in PositionsSheet
+			For i = 0 To GetLastUsedColumn(PositionsSheet)
+				'Check whether Headers  array is large enough, otherwise increase its size
+				If UBound(Headers, 2) < i Then
+					ReDim Preserve Headers(2, i + 10 ) As String
+				End If
+				'Check whether PersonData  array is large enough, otherwise increase its size
+				If UBound(PersonData, 2) < i Then
+					ReDim Preserve PersonData(2, i + 10 ) As String
+				End If
+				Headers(1, i) = PositionsSheet.getCellByPosition(i, 0).String
+				PersonData(1, i) = PositionsSheet.getCellByPosition(i, CellRow).String
+			Next i
+			For i = 5 To GetLastUsedColumn(PositionsSheet)	'from 3 because columns 0,1,2 are reserved for id and name
+				If containsStringInArray( Headers(1, i), VC_Phone ) Then
+					workPhone = PersonData(1, i)
+				ElseIf containsStringInArray( Headers(1, i), VC_URL ) Then
+					workURL = PersonData(1, i)
+				ElseIf containsStringInArray( Headers(1, i), VC_Street ) Then
+					workStreet = PersonData(1, i)
+				ElseIf containsStringInArray( Headers(1, i), VC_POBox ) Then
+					workPOBox = PersonData(1, i)
+				ElseIf containsStringInArray( Headers(1, i), VC_PostalCode ) Then
+					workPostalCode = PersonData(1, i)
+				ElseIf containsStringInArray( Headers(1, i), VC_Location ) Then
+					workArea = PersonData(1, i)			
+				ElseIf containsStringInArray( Headers(1, i), VC_Region ) Then
+					workRegion = PersonData(1, i)						
+				ElseIf containsStringInArray( Headers(1, i), VC_Country ) Then
+					workCountry = PersonData(1, i)						
+				ElseIf containsStringInArray( Headers(1, i), VC_Email ) Then
+					workEmail = PersonData(1, i)						
+				ElseIf containsStringInArray( Headers(1, i), VC_URL ) Then
+					workURL = PersonData(1, i)						
+				ElseIf containsStringInArray( Headers(1, i), VC_Cellphone ) Then
+					workCellphone = PersonData(1, i)						
+				ElseIf containsStringInArray( Headers(1, i), VC_Fax ) Then
+					workFax = PersonData(1, i)						
+				End If
+			Next i	
+		'Loop
+		End If
+		
+		
+		
+		'Organisation Unit is ORG: organisationName; organisationUnit; anotherOrganisationUnit
+		
+		Dim vcardFile As Integer
+		If (fileName <> "") Then
+			If Right(fileName, 1) = "/" Then
+				absoluteFileName = ConvertFromURL( fileName & PersonData(0, 1) & " " & PersonData(0, 2) & ".vcf" )
+			Else
+				absoluteFileName = ConvertFromURL( fileName & "/" & PersonData(0, 1) & " " & PersonData(0, 2) & ".vcf" )
+			End If
+			'fileName = "C:\TEMP\data.txt"
+			vcardFile = Freefile
+			Open absoluteFileName For Output As #vcardFile
+			Print #vcardFile, "BEGIN:VCARD"
+			Print #vcardFile, "VERSION:2.1"
+			Print #vcardFile, "N:" & PersonData(0, 2) & ";" & PersonData(0, 1) 'person name
+			Print #vcardFile, "FN:" & PersonData(0, 1) & " " & PersonData(0, 2) 'person alias
+			If (NOT IsEmpty(personTitle)) AND personTitle <> "" Then
+				Print #vcardFile, "TITLE:" & personTitle
+			End If
+			If (NOT IsEmpty(personOrganisation)) AND personOrganisation <> "" Then
+				Print #vcardFile, "ORG:" & personOrganisation
+			End If
+			If (NOT IsEmpty(personProfession)) AND personProfession <> "" Then
+				Print #vcardFile, "ROLE:" & personProfession
+			End If
+			If (NOT IsEmpty(homePhone)) AND homePhone <> "" Then
+				Print #vcardFile, "TEL;VOICE;HOME:" & homePhone
+			End If
+			If (NOT IsEmpty(workPhone)) AND workPhone <> "" Then
+				Print #vcardFile, "TEL;VOICE;WORK:" & workPhone
+			End If
+			If (NOT IsEmpty(homeEmail)) AND homeEmail <> "" Then	
+				Print #vcardFile, "EMAIL;INTERNET;HOME:" & homeEmail
+			End If
+			If (NOT IsEmpty(workEmail)) AND workEmail <> "" Then	
+				Print #vcardFile, "EMAIL;INTERNET;WORK:" & workEmail
+			End If
+			If (NOT IsEmpty(homeURL)) AND homeURL <> "" Then	
+				Print #vcardFile, "URL;HOME:" & homeURL
+			End If
+			If (NOT IsEmpty(workURL)) AND workURL <> "" Then	
+				Print #vcardFile, "URL;WORK:" & workURL
+			End If
+			If (NOT IsEmpty(homeCellphone)) AND homeCellphone <> "" Then	
+				Print #vcardFile, "TEL;CELL;HOME:" & homeCellphone
+			End If
+			If (NOT IsEmpty(workCellphone)) AND workCellphone <> "" Then	
+				Print #vcardFile, "TEL;CELL;WORK:" & workCellphone
+			End If
+			If (NOT IsEmpty(homeFax)) AND homeFax <> "" Then	
+				Print #vcardFile, "TEL;FAX;HOME:" & homeFax
+			End If
+			If (NOT IsEmpty(workFax)) AND workFax <> "" Then	
+				Print #vcardFile, "TEL;FAX;WORK:" & workFax
+			End If
+			If (NOT IsEmpty(homeStreet)) AND homeStreet <> "" Then 
+				homeAddress = "ADR;HOME:"
+				labelHomeAddress = "LABEL;HOME;ENCODING=QUOTED-PRINTABLE:"
+				If (NOT IsEmpty(homePOBox)) AND homePOBox <> "" Then
+					homeAddress = homeAddress & homePOBox
+				Else
+					homeAddress = homeAddress 	
+				End If
+				If (NOT IsEmpty(homeExtension)) AND homeExtension <> "" Then
+					homeAddress = homeAddress & ";" & homeExtension
+				Else
+					homeAddress = homeAddress & ";"		
+				End If
+				If (NOT IsEmpty(homeStreet)) AND homeStreet <> "" Then
+					homeAddress = homeAddress & ";" & homeStreet
+					labelHomeAddress = labelHomeAddress & homeStreet
+				Else
+					homeAddress = homeAddress & ";"		
+					labelHomeAddress = labelHomeAddress & "=0D=0A"				
+				End If
+				If (NOT IsEmpty(homeArea)) AND homeArea <> "" Then
+					homeAddress = homeAddress & ";" & homeArea
+					labelHomeAddress = labelHomeAddress & "=0D=0A" & homeArea
+				Else
+					homeAddress = homeAddress & ";"		
+					labelHomeAddress = labelHomeAddress & "=0D=0A"				
+				End If
+				If (NOT IsEmpty(homeRegion)) AND homeRegion <> "" Then	
+					homeAddress = homeAddress & ";" & homeRegion
+					labelHomeAddress = labelHomeAddress & "=0D=0A" & homeRegion			
+				Else
+					homeAddress = homeAddress & ";"		
+					labelHomeAddress = labelHomeAddress & "=0D=0A"				
+				End If
+				If (NOT IsEmpty(homePostalCode)) AND homePostalCode <> "" Then
+					homeAddress = homeAddress & ";"	& homePostalCode
+					labelHomeAddress = labelHomeAddress & "=0D=0A"	& homePostalCode				
+				Else
+					homeAddress = homeAddress & ";"		
+					labelHomeAddress = labelHomeAddress & "=0D=0A"				
+				End If
+				If (NOT IsEmpty(homeCountry)) AND homeCountry <> "" Then
+					homeAddress = homeAddress & ";"	& homeCountry
+					labelHomeAddress = labelHomeAddress & "=0D=0A"	& homeCountry				
+				Else
+					homeAddress = homeAddress & ";"	& "Ελλάδα"	
+					labelHomeAddress = labelHomeAddress & "=0D=0A" & "Ελλάδα"			
+				End If
+				Print #vcardFile, homeAddress
+				Print #vcardFile, labelHomeAddress
+			End If
+			If (NOT IsEmpty(workStreet)) AND workStreet <> "" Then 
+				workAddress = "ADR;WORK:"
+				labelWorkAddress = "LABEL;WORK;ENCODING=QUOTED-PRINTABLE:"
+				If (NOT IsEmpty(workPOBox)) AND workPOBox <> "" Then
+					workAddress = workAddress & workPOBox
+				Else
+					workAddress = workAddress 	
+				End If
+				If (NOT IsEmpty(workExtension)) AND workExtension <> "" Then
+					workAddress = workAddress & ";" & workExtension
+				Else
+					workAddress = workAddress & ";"		
+				End If
+				If (NOT IsEmpty(workStreet)) AND workStreet <> "" Then
+					workAddress = workAddress & ";" & workStreet
+					labelworkAddress = labelworkAddress & workStreet
+				Else
+					workAddress = workAddress & ";"		
+					labelworkAddress = labelworkAddress & "=0D=0A"				
+				End If
+				If (NOT IsEmpty(workArea)) AND workArea <> "" Then
+					workAddress = workAddress & ";" & workArea
+					labelworkAddress = labelworkAddress & "=0D=0A" & workArea
+				Else
+					workAddress = workAddress & ";"		
+					labelworkAddress = labelworkAddress & "=0D=0A"				
+				End If
+				If (NOT IsEmpty(workRegion)) AND workRegion <> "" Then	
+					workAddress = workAddress & ";" & workRegion
+					labelworkAddress = labelworkAddress & "=0D=0A" & workRegion			
+				Else
+					workAddress = workAddress & ";"		
+					labelworkAddress = labelworkAddress & "=0D=0A"				
+				End If
+				If (NOT IsEmpty(workPostalCode)) AND workPostalCode <> "" Then
+					workAddress = workAddress & ";"	& workPostalCode
+					labelworkAddress = labelworkAddress & "=0D=0A"	& workPostalCode				
+				Else
+					workAddress = workAddress & ";"		
+					labelworkAddress = labelworkAddress & "=0D=0A"				
+				End If
+				If (NOT IsEmpty(workCountry)) AND workCountry <> "" Then
+					workAddress = workAddress & ";"	& workCountry
+					labelworkAddress = labelworkAddress & "=0D=0A"	& workCountry				
+				Else
+					workAddress = workAddress & ";"	& "Ελλάδα"	
+					labelworkAddress = labelworkAddress & "=0D=0A" & "Ελλάδα"			
+				End If
+				Print #vcardFile, workAddress
+				Print #vcardFile, labelworkAddress
+			End If
+			Print #vcardFile, "END:VCARD"		
+			Close #vcardFile
+		End If
+	
+	ErrorHandler: 
+		If Err Then
+			MsgBox "Σφάλμα Νο" & Err & ": " & Error$, "Σφάλμα"
+		End If
+End Sub
+
+
+Function containsStringInArray( stringToSearch As String, stringArrayToLook() ) As Boolean
+	Dim foundit
+
+	foundit = false
+	For i = LBound(stringArrayToLook) To UBound(stringArrayToLook)
+		If InStr(stringToSearch, stringArrayToLook(i)) > 0 Then
+			foundit = true
+		End If
+	Next i
+	
+	containsStringInArray = foundit
+End Function
+
+
+Function SelectFileOpen(dialogTitle As String, filterDescription As String, filterType As String)
+	'Set the Dialog Arguments to a Template for FILESAVE 
+	sFilePickerArgs = Array(com.sun.star.ui.dialogs.TemplateDescription.FILEOPEN_SIMPLE ) 
+	
+	' register the Service for Filepicker 
+	oFilePicker = CreateUnoService( "com.sun.star.ui.dialogs.FilePicker" ) 
+	
+	' Pass some arguments to it 
+	With oFilePicker 
+		.Initialize( sFilePickerArgs() ) 
+		.appendFilter( filterDescription, filterType ) 
+		.setTitle( dialogTitle ) 
+	End With 
+	
+	
+	' If the savepath is selected return the complete path and display it in an messagebox 
+	If oFilePicker.execute() Then 
+		sFiles = oFilePicker.getFiles() 
+		SelectFileOpen = sFiles(0) 
+	End If 
+	
+	' Close the Dialog 
+	oFilePicker.Dispose() 
+End Function 
+
+
+Function SelectFolder( savePath As String, dialogTitle As String )
+	
+	' register the Service for Filepicker 
+	oFolderPicker = CreateUnoService( "com.sun.star.ui.dialogs.FolderPicker" ) 
+	
+	With oFolderPicker 
+	'	.appendFilter("VCARD", "*.vcf" ) 
+	'	.Initialize( sFilePickerArgs() ) 
+	'	.appendFilter( "Αρχείο VCARD", "*.vcf" ) 
+		.setTitle( dialogTitle ) 
+	End With 
+	
+	If len(savePath > 0) Then
+		oFolderPicker.setDisplayDirectory( ConvertToURL( savePath ) )
+	End If
+	
+	' If the savepath is selected return the complete path and display it in an messagebox 
+	If oFolderPicker.execute() Then 
+		cPickedFolder = oFolderPicker.getDirectory() 
+		SelectFolder = cPickedFolder
+	End If 
+	
+End Function
+
+
+Sub MassivelyExportVCARD
+	Dim Sheet As Object, PositionsSheet As Object, OrgUnitsSheet As Object
+	Dim inputError As Boolean
+	
+	inputError = false
+	Sheet = ThisComponent.GetCurrentController.ActiveSheet	
+	If NOT inputError AND Sheet.Name <> PERSONS_SHEETNAME Then
+		MsgBox "Παρακαλώ επιλέξτε πρόσωπο για εξαγωγή VCARD από το φύλλο εργασίας " & PERSONS_SHEET, 48, "Λανθασμένη Επιλογή"
+		inputError = true
+	End If		
+	PositionsSheet = ThisComponent.Sheets.getByName(POSITIONS_SHEETNAME)
+	OrgUnitsSheet = ThisComponent.Sheets.getByName(ORGUNITS_SHEETNAME)
+	If NOT inputError AND IsNull(OrgUnitsSheet) Then	'Rule 1
+		inputError = true
+		MsgBox "Το φύλλο εργασίας " & ORGUNITS_SHEETNAME & " δε βρέθηκε", 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+	End If
+	If NOT inputError AND IsNull(PositionsSheet) Then	'Rule 2
+		inputError = true
+		MsgBox "Το φύλλο εργασίας " & POSITIONS_SHEETNAME & " δε βρέθηκε", 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+	End If
+	If NOT inputError AND ValidateOrganisationChartData = 0 Then
+		Dim selectedFileName As String
+		'Print "Selected file: " + SelectFolder("C:", "Εξαγωγή VCARD ως ...")
+		selectedFileName =  SelectFolder("", "Εξαγωγή VCARD ως ...") 
+		For j = HEADER_ROWS_PER_SHEET To GetLastUsedRow(Sheet)
+			SavePersonVCARD(j, selectedFileName)
+		Next j
+	End If
+End Sub
+
+Sub ImportVCARD
+	On Error Goto ErrorHandler
+	Dim selectedFileName As String
+	Dim Msg As String
+	Dim vcardFile As Integer	
+	Dim vcardData As VCARDType
+	
+	If MsgBox("Η λειτουργία αυτή ενδέχεται να μεταβάλει τα δεδομένα στα φύλλα εργασίας σας. Σας προτείνουμε να αποθηκεύσετε πρώτα το έγγραφό σας. Θέλετε να συνεχίσετε;", MB_OKCANCEL + MB_ICONQUESTION, "Επιβεβαίωση εισαγωγής στοιχείων") = IDOK Then
+		'MsgBox "you are a brave man!"
+	Else
+		Exit Sub
+	End If 
+
+	vcardData = createObject("VCARDType")
+	selectedFileName =  SelectFileOpen("Εισαγωγή VCARD από αρχείο", "*.vcf", "*.vcf") 
+	'print selectedFileName
+	
+	If (selectedFileName <> "") Then
+		vcardFile = Freefile
+		Open selectedFileName For Input As #vcardFile
+			Do While not eof(#vcardFile)
+			  ' Read line 
+			  Line Input #vcardFile, CurrentLine   
+			  If CurrentLine <>"" then
+			  	ParseVCARDLine(CurrentLine, vcardData)
+			  	'if the VCARD has successfully completed, process the vcardData and goto the next VCARD in the file
+			  	If vcardData.hasOpened = True AND vcardData.hasClosed = True Then
+			  		FillOrganisationWith(vcardData)	'fill in cells with VCARD data
+			  		FlushVCARD(vcardData)	're-initialize the vcard object, by emptying all strings			  		
+			  	End If
+			    'Msg = Msg & CurrentLine & Chr(13)
+			  end if
+			Loop
+		Close #vcardFile
+'		MsgBox Msg
+	End If
+	
+ErrorHandler: 
+	If Err Then
+		MsgBox "Σφάλμα Νο" & Err & ": " & Error$, "Σφάλμα"
+	End If
+End Sub
+
+'CAUTION:
+'This is an approximate (NOT EXACT) implementation of a VCARD v2.1 parser
+'Not all features are supported
+Function ParseVCARDLine(dataLine As String, vcardStruct As Object)
+	Dim commandPart As String, paramPart As String
+	Dim temp As String
+	
+	commandPart = FindFirstIn(dataline, ":")	'this stores the VCARD property type
+	paramPart = ReturnNextOf(dataLine, ":")		'this stores the VCARD property value
+	'Now, if a valid VCARD property value has been retrieved, parse and store in our VCARDType
+	If paramPart <> "" Then
+		If InStr(dataLine, "BEGIN:VCARD") <>0 Then
+			vcardStruct.hasOpened = True
+		ElseIf InStr(dataLine, "END:VCARD") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			vcardStruct.hasClosed = True
+		ElseIf InStr(commandPart, "VERSION") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			vcardStruct.version = paramPart
+		ElseIf Right(commandPart, 2) ="FN" AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			vcardStruct.formattedName = paramPart
+		ElseIf Right(commandPart, 1) ="N" AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then 
+			'parse params for Family Name (first field); Given Name (second field); Additional Names (third field); Name Prefix (fourth field); and Name Suffix (fifth field) strings
+			vcardStruct.lastName = FindFirstIn(paramPart, ";")
+			temp = ReturnNextOf(paramPart, ";")
+			vcardStruct.firstName = FindFirstIn(temp, ";") 'we don't care about following prefixes and sufixes
+		ElseIf InStr(commandPart, "TEL") =1 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			'for 1:N properties, append them to proper VCARD type attribute strings, by delimiting with ";"
+			If InStr(commandPart, "WORK") <>0 Then
+				If InStr(commandPart, "CELL") <>0 Then
+					vcardStruct.workCellPhone = UpdateProperty(vcardStruct.workCellPhone, paramPart)
+				ElseIf InStr(commandPart, "FAX") <>0 Then
+					vcardStruct.workFax = UpdateProperty(vcardStruct.workFax, paramPart)
+				Else
+					vcardStruct.workPhone = UpdateProperty(vcardStruct.workPhone, paramPart)
+				End If
+			Else 'it is a HOME telephone
+				If InStr(commandPart, "CELL") <>0 Then
+					vcardStruct.homeCellPhone = UpdateProperty(vcardStruct.homeCellPhone, paramPart)
+				ElseIf InStr(commandPart, "FAX") <>0 Then
+					vcardStruct.homeFax = UpdateProperty(vcardStruct.homeFax, paramPart)
+				Else
+					vcardStruct.homePhone = UpdateProperty(vcardStruct.homePhone, paramPart)
+				End If
+			End If
+		ElseIf InStr(commandPart, "EMAIL") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			If InStr(commandPart, "WORK") <>0 Then
+				vcardStruct.workEmail = UpdateProperty(vcardStruct.workEmail, paramPart)
+			Else
+				vcardStruct.homeEmail = UpdateProperty(vcardStruct.homeEmail, paramPart)
+			End If
+		ElseIf InStr(commandPart, "URL") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			If InStr(commandPart, "WORK") <>0 Then
+				vcardStruct.workURL = UpdateProperty(vcardStruct.workURL, paramPart)
+			Else
+				vcardStruct.homeURL = UpdateProperty(vcardStruct.homeURL, paramPart)
+			End If
+		ElseIf InStr(commandPart, "ROLE") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			vcardStruct.profession = paramPart
+		ElseIf InStr(commandPart, "TITLE") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			vcardStruct.organisationRole = paramPart
+		ElseIf InStr(commandPart, "ADR") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			'parse params for Post Office Address (first field); Extended Address (second field); Street (third field); Locality (fourth field); Region (fifth field); Postal Code (six field); and Country (seventh field) strings
+			temp = paramPart
+			iIndex = 1
+			If InStr(commandPart, "WORK") <>0 Then
+				Do While temp <> ""
+					Select Case iIndex:
+					Case 1
+						vcardStruct.workAddressPOBox = FindFirstIn(temp, ";")
+					Case 2
+						vcardStruct.workAddressExtended = FindFirstIn(temp, ";")
+					Case 3
+						vcardStruct.workAddressStreet = FindFirstIn(temp, ";")
+					Case 4
+						vcardStruct.workAddressLocality = FindFirstIn(temp, ";")
+					Case 5
+						vcardStruct.workAddressRegion = FindFirstIn(temp, ";")
+					Case 6
+						vcardStruct.workAddressPCode = FindFirstIn(temp, ";")
+					Case 7
+						vcardStruct.workAddressCountry = FindFirstIn(temp, ";")
+					End Select
+					temp = ReturnNextOf(temp, ";")
+					iIndex = iIndex +1
+				Loop
+			Else
+				Do While temp <> ""
+					Select Case iIndex:
+					Case 1
+						vcardStruct.homeAddressPOBox = FindFirstIn(temp, ";")
+					Case 2
+						vcardStruct.workAddressExtended = FindFirstIn(temp, ";")
+					Case 3
+						vcardStruct.homeAddressStreet = FindFirstIn(temp, ";")
+					Case 4
+						vcardStruct.homeAddressLocality = FindFirstIn(temp, ";")
+					Case 5
+						vcardStruct.homeAddressRegion = FindFirstIn(temp, ";")
+					Case 6
+						vcardStruct.homeAddressPCode = FindFirstIn(temp, ";")
+					Case 7
+						vcardStruct.homeAddressCountry = FindFirstIn(temp, ";")
+					End Select
+					temp = ReturnNextOf(temp, ";")
+					iIndex = iIndex +1
+				Loop
+			End If
+		ElseIf InStr(commandPart, "LABEL") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			If InStr(commandPart, "WORK") <>0 Then
+				vcardStruct.workLabel = paramPart
+			Else
+				vcardStruct.homeLabel = paramPart
+			End If
+		ElseIf InStr(commandPart, "ORG") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			'parse params for Organization Name (first field); Organizational Unit (second field) strings; More Organizational Unit(s). Additional positional fields, if specified, contain additional Organizational Units. 
+			vcardStruct.organisationName = FindFirstIn(paramPart, ";")
+			temp = ReturnNextOf(paramPart, ";")
+			vcardStruct.organisationUnit = FindFirstIn(temp, ";") 'we don't care about following units
+		ElseIf InStr(commandPart, "REV") <>0 AND vcardStruct.hasOpened = True AND vcardStruct.hasClosed = False Then
+			vcardStruct.revision = paramPart
+		End If
+	End If
+End Function
+
+
+Function UpdateProperty(oldValue, newValue) As String
+	If oldValue = "" Then
+		UpdateProperty = newValue
+	Else
+		UpdateProperty = oldValue & ";" & newValue
+	End If
+End Function
+
+'this function will return the row number if the ID1 and ID2 arguments are found in the first one or two columns of sheetArray
+'otherwise it will return -1
+Function GetEntityRow(sheetArray() As Object, vcardID1 As String, optional vcardID2 As String) As Long
+	Dim foundRow As Long
+	Dim secondCondition As Boolean
+	
+	foundRow = -1
+	If vcardID1 <>"" Then
+		For iIndex = HEADER_ROWS_PER_SHEET To UBound(sheetArray())
+			If IsMissing(vcardID2) Then
+				secondCondition = True
+			Else
+				secondCondition = (sheetArray(iIndex)(2) = vcardID2)
+			End If	
+			If sheetArray(iIndex)(1) = vcardID1 AND secondCondition Then
+				foundRow = iIndex
+				Exit For
+			End If
+		Next iIndex
+	End If
+	If foundRow = -1 Then
+		foundRow = UBound(sheetArray())
+	Else
+		If IsMissing(vcardID2) Then
+			temp = ""
+		Else
+			temp = vcardID2
+		End If
+		If MsgBox("Βρέθηκε η ίδια εγγραφή " & vcardID1 & " " & temp & " στην VCARD προς εισαγωγή και στο έγγραφο. Απαντήστε ΝΑΙ για να γίνει συγχώνευση, ΟΧΙ για να δημιουργηθεί νέα εγγραφή", _
+		MB_YESNO + MB_ICONQUESTION, "Επιβεβαίωση") = IDNO Then
+			foundRow = UBound(sheetArray())
+		End If		
+	End If
+	GetEntityRow = foundRow
+End Function
+
+Function GetColumnNumber(sheetArray() As Object, vcardVoc As Object) As Long
+	Dim columnNumber As Long
+	Dim rIndex As Long, cIndex As Long
+
+	columnNumber = 0	'0 is not for the first column (A) but indicates an error value
+	For rIndex = LBound(sheetArray()) To HEADER_ROWS_PER_SHEET-1
+		wholeRow() = sheetArray(rIndex)
+		For cIndex = LBound(wholeRow()) To UBound(wholeRow())
+			If columnNumber <>0 Then
+				Exit For
+			End If
+			If containsStringInArray( wholeRow(cIndex), vcardVoc ) Then
+				columnNumber = cIndex
+				Exit For
+			End If
+		Next cIndex
+	Next rIndex
+	GetColumnNumber = columnNumber
+End Function
+	
+Function GetVCARDProperty(sheetArray() As Object, vcardProperty As String, rowNumber As Long, columnNumber As Long) As Variant
+	Dim returnValue As Variant, toBeAppendedString As String, temp As String, propertyPart As String
+	
+	If columnNumber > 0 Then
+		If rowNumber = UBound(sheetArray()) Then
+			returnValue = vcardProperty
+		Else
+			'Search each delimited value in vcardProperty if it matches an existing substring of sheetArray(rowNumber)(columnNumber)
+			temp = vcardProperty
+			Do While temp <> ""
+				propertyPart = FindFirstIn(temp, ";")
+				If InStr(sheetArray(rowNumber)(columnNumber), propertyPart) =0 Then
+					'If not found, append to the toBeAppendedString
+					toBeAppendedString = toBeAppendedString & ";" & propertyPart
+				End If
+				temp = ReturnNextOf(temp, ";")
+			Loop
+			'At last, append the toBeAppendedString to existing value
+			returnValue = sheetArray(rowNumber)(columnNumber) & toBeAppendedString
+		End If
+	Else
+		'In this case we should not do anything, but because this has to return a value that will be assigned to sheetArray(rowNumber)(0)
+		If IsNumeric(sheetArray(rowNumber)(0)) Then
+			returnValue = CLng(sheetArray(rowNumber)(0)) 'it is reproducing the existing value
+		Else
+			returnValue = sheetArray(rowNumber)(0)
+		End If
+	End If
+	GetVCARDProperty = returnValue
+End Function
+
+
+Sub FillOrganisationWith(vc As Variant)
+	Dim PersonsSheet As Object, PositionsSheet As Object, OrgUnitsSheet As Object
+	Dim MaxOrgUnitsRows As Long, MaxPositionsRows As Long, MaxPersonsRows As Long
+	Dim MaxOrgUnitsCols As Long, MaxPositionsCols As Long, MaxPersonsCols As Long
+	Dim personLink As String
+	
+	Call InitializeVocabulary	
+	If vc.hasOpened = True AND vc.hasClosed = True AND ValidateOrganisationChartData = 0 Then
+		OrgUnitsSheet = ThisComponent.Sheets.getByName(ORGUNITS_SHEETNAME)
+		MaxOrgUnitsRows = GetLastUsedRow(OrgUnitsSheet)
+		MaxOrgUnitsCols = GetLastUsedColumn(OrgUnitsSheet)
+		OrgUnitsArray = OrgUnitsSheet.GetCellRangeByPosition(0, 0, MaxOrgUnitsCols, MaxOrgUnitsRows+1).getDataArray()	'we get one more row in case we need to fill a new record in MaxRows+1
+		PositionsSheet = ThisComponent.Sheets.getByName(POSITIONS_SHEETNAME)
+		MaxPositionsRows = GetLastUsedRow(PositionsSheet)
+		MaxPositionsCols = GetLastUsedColumn(PositionsSheet)
+		PositionsArray = PositionsSheet.GetCellRangeByPosition(0, 0, MaxPositionsCols, MaxPositionsRows+1).getDataArray()	'we get one more row in case we need to fill a new record in MaxRows+1
+		PersonsSheet = ThisComponent.Sheets.getByName(PERSONS_SHEETNAME)
+		MaxPersonsRows = GetLastUsedRow(PersonsSheet)
+		MaxPersonsCols = GetLastUsedColumn(PersonsSheet)
+		PersonsArray = PersonsSheet.GetCellRangeByPosition(0, 0, MaxPersonsCols, MaxPersonsRows+1).getDataArray()	'we get one more row in case we need to fill a new record in MaxRows+1
+		With vc
+			rowNumber = GetEntityRow(PersonsArray, .firstName, .lastName)
+			If rowNumber = UBound(PersonsArray()) Then
+				'rowNumber = UBound(PersonsArray())
+				'Find maximum ID in first column
+				idRange = PersonsSheet.getCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 0, MaxPersonsRows)
+				MaximumRowID = idRange.computeFunction(com.sun.star.sheet.GeneralFunction.MAX)
+				PersonsArray(rowNumber)(0) = MaximumRowID +1
+			End If
+			PersonsArray(rowNumber)(1) = GetVCARDProperty(PersonsArray, .firstName, rowNumber, 1)
+			PersonsArray(rowNumber)(2) = GetVCARDProperty(PersonsArray, .lastName, rowNumber, 2)
+			colNumber = GetColumnNumber(PersonsArray, VC_Phone)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homePhone, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_Cellphone)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeCellPhone, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_Fax)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeFAX, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_Email)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeEmail, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_URL)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeURL, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_POBox)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeAddressPOBox, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_Street)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeAddressStreet, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_Location)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeAddressLocality, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_Region)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeAddressRegion, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_PostalCode)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeAddressPCode, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PersonsArray, VC_Country)
+			PersonsArray(rowNumber)(colNumber) = GetVCARDProperty(PersonsArray, .homeAddressCountry, rowNumber, colNumber)
+			'Now, get all those arrays back to the Sheets
+			For iIndex = 0 To MaxPersonsCols
+				PersonsSheet.getCellByPosition(iIndex, rowNumber).Formula = PersonsArray(rowNumber)(iIndex)
+			Next iIndex
+			UpdateSheetColumnsValidation(PERSONS_SHEETNAME)
+					
+			personLink = PersonsArray(rowNumber)(0) & ":" & PersonsArray(rowNumber)(1) & " " & PersonsArray(rowNumber)(2)
+			rowNumber = GetEntityRow(PositionsArray, .organisationRole)
+			If rowNumber = UBound(PositionsArray()) Then
+				'rowNumber = UBound(PositionsArray())
+				'Find maximum ID in first column
+				idRange = PositionsSheet.getCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 0, MaxPositionsRows)
+				MaximumRowID = idRange.computeFunction(com.sun.star.sheet.GeneralFunction.MAX)
+				PositionsArray(rowNumber)(0) = MaximumRowID +1
+				PositionsArray(rowNumber)(3) = personLink
+			End If
+			PositionsArray(rowNumber)(1) = GetVCARDProperty(PositionsArray, .organisationRole, rowNumber, 1)
+			colNumber = GetColumnNumber(PositionsArray, VC_Phone)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workPhone, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_Cellphone)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workCellPhone, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_Fax)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workFAX, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_Email)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workEmail, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_URL)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workURL, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_POBox)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workAddressPOBox, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_Street)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workAddressStreet, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_Location)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workAddressLocality, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_Region)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workAddressRegion, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_PostalCode)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workAddressPCode, rowNumber, colNumber)
+			colNumber = GetColumnNumber(PositionsArray, VC_Country)
+			PositionsArray(rowNumber)(colNumber) = GetVCARDProperty(PositionsArray, .workAddressCountry, rowNumber, colNumber)
+			'Now, get all those arrays back to the Sheets
+			For iIndex = 0 To MaxPositionsCols
+				PositionsSheet.getCellByPosition(iIndex, rowNumber).Formula = PositionsArray(rowNumber)(iIndex)
+			Next iIndex
+			UpdateSheetColumnsValidation(POSITIONS_SHEETNAME)
+		End With
+	End If
+End Sub
+
+
+Sub FlushVCARD(vc As Variant)
+	With vc
+		.hasOpened = False
+		.hasClosed = False
+		.version = ""
+		.firstName = ""
+		.lastName = ""
+		.formattedName = ""
+		.revision = ""
+		
+		.homePhone = ""
+		.homeCellPhone = ""
+		.homeFax = ""
+		.homeEmail = ""
+		.homeURL = ""
+		.homeAddressPOBox = ""
+		.homeAddressExtended = ""
+		.homeAddressStreet = ""
+		.homeAddressLocality = ""
+		.homeAddressRegion = ""
+		.homeAddressPCode = ""
+		.homeAddressCountry = ""
+		.homeLabel = ""
+	
+		.organisationName = ""
+		.organisationUnit = ""
+		.organisationRole = ""
+		.profession = ""
+	
+		.workPhone = ""
+		.workCellPhone = ""
+		.workFax = ""
+		.workEmail = ""
+		.workURL = ""
+		.workAddressPOBox = ""
+		.workAddressExtended = ""
+		.workAddressStreet = ""
+		.workAddressLocality = ""
+		.workAddressRegion = ""
+		.workAddressPCode = ""
+		.workAddressCountry = ""
+		.workLabel = ""
+	End With
+End Sub

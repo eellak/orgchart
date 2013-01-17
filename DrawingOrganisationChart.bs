@@ -1,0 +1,1397 @@
+REM  *****  BASIC  *****
+REM Developer of this Basic module: Elias Kalapanidas
+REM and sole responsible for the mess in the code
+
+'--------------------------------------------------------------------------------------
+'Here starts the generic drawing functions
+Dim MAX_PAGE_WIDTH As Long
+Dim MAX_PAGE_HEIGHT As Long
+Public Const MAX_PAGE_BORDER_TOP As Long = 2000
+Public Const MAX_PAGE_BORDER_LEFT As Long = 2000
+Public Const MAX_PAGE_BORDER_RIGHT As Long = 2000
+Public Const MAX_PAGE_BORDER_BOTTOM As Long = 2000
+'How many tree depth to explore before deciding that the tree includes circular references, and that it is not acyclical directed graph
+Public Const MAX_ORGANISATION_UNITS_TREE_DEPTH = 30
+Dim NODE_WIDTH As Long
+Dim NODE_HEIGHT As Long
+Dim NODE_FONT_SIZE As Integer
+Dim NODE_FONT_NAME As String
+Dim POSITION_OWNS_PERSON As Boolean
+Dim DRAW_PERSONS As Boolean
+Dim DRAW_POSITIONS As Boolean
+Public Const STRING_WRAPPING As Boolean = False
+Dim PersonBoxColor As Long '= &H00ffff 'Hexadecimal for RGB color: red=ff, green=00, blue=00
+Dim PositionBoxColor As Long '= &Hffff00 'Hexadecimal for Yellow
+Dim OrgUnitBoxColor As Long '= &Hff00ff 'Hexadecimal for Purple
+Public Const DefaultPersonBoxColor As Long = &Hfff0f5 'color = lavender blush
+Public Const DefaultPositionBoxColor As Long = &Hc1ffc1 'color = dark sea green
+Public Const DefaultOrgUnitBoxColor As Long = &Hffdab9 'color = pitch puff
+Dim PickedColor As Long
+Dim DrawBelongsToRelationships As Boolean
+Dim DrawRefersToRelationships As Boolean
+Dim fitDrawingToPage As Boolean 'Περιορισμός και στοίχιση των κόμβων στα όρια της σελίδας=Ναι/Όχι
+Dim DrawingBeautification As Boolean
+Dim DrawingBeautificationEnergyThreshold As Double
+Dim DrawingBeautificationCoefficientK As Double
+Dim DrawingBeautificationCoefficientC As Double
+Dim DrawingBeautificationDumping As Double
+Dim DrawingRenderAsSelection As Integer '1 for renderAsDraw, 2 for renderAsDot
+
+Type GraphShapeType
+	positionX As Long
+	positionY As Long
+	forceX As Double
+	forceY As Double
+	velocityX As Double
+	velocityY As Double
+	energy As Double
+	label As String
+	shapeEntity As String
+	sizeWidth As Long
+	sizeHeight As Long
+	mass As Double
+End Type
+
+Type GraphConnectorType
+	startShape As String
+	endShape As String
+	startGluePoint As Integer
+	endGluePoint As Integer
+End Type
+
+Dim shapeArray(0) As New GraphShapeType
+Dim relationArray(0) As New GraphConnectorType
+
+'These will store the strings of the nodes and connectors that are to be drawn under the selected org. unit
+'These are a subpart of the whole sheet rows (data)
+Dim orgUnitNodes(0,1) As String
+Dim positionNodes(0) As String
+Dim personNodes(0) As String
+'the first index is the connector ID, 
+'the second is the string of the FROM and TO connecting nodes:
+'0 for FROM node of the relationship
+'1 for TO node of the relationship
+'2 for the type of relationship (e.g. belongsTo, refersTo)
+Dim nodeConnectors(0,2) As String 
+
+
+'This is the main drawing object, the Draw document
+Dim drawDoc As Object
+
+Public Const dumpingConst As Double = 0.9
+Public Const springK As Double = 2.0
+Public Const coulombC As Double = 2.0
+
+
+'--------------------------------------------------------------------------------------
+'Here starts the ChartOptions Dialog part of the code
+Dim ChartOptionsDialog As Object
+'including the color picker dialog for background (box) color selection
+Dim ColorPickerDialog As Object
+
+
+Sub CallChartOptionsDialog
+	'Get the list of system fonts:
+	Dim oToolkit as Object 
+	oToolkit = CreateUnoService("com.sun.star.awt.Toolkit") 
+	Dim oDevice as Variant 
+	oDevice = oToolkit.createScreenCompatibleDevice(0, 0) 
+	Dim oFontDescriptors As Variant 
+	oFontDescriptors = oDevice.FontDescriptors 
+	Dim oFontDescriptor As Object 
+	Dim sFontList as String 
+	Dim iIndex as Integer, iStart As Integer, iTotal As Integer, iAdjust As Integer 
+	iTotal = UBound(oFontDescriptors) - LBound(oFontDescriptors) + 1 
+	
+	CalcDoc = ThisComponent
+
+	If ValidateOrganisationChartData = 0 Then
+		DialogLibraries.LoadLibrary("Standard")
+		ChartOptionsDialog = CreateUnoDialog(DialogLibraries.Standard.ChartOptionsDialog)
+		OptionOrganisationUnitToDraw = ChartOptionsDialog.getControl("OptionOrganisationUnitToDraw")
+		OptionPageWidth = ChartOptionsDialog.getControl("OptionPageWidth")
+		OptionPageHeight = ChartOptionsDialog.getControl("OptionPageHeight")
+		OptionNodeWidth = ChartOptionsDialog.getControl("OptionNodeWidth")
+		OptionNodeHeight = ChartOptionsDialog.getControl("OptionNodeHeight")
+		OptionBelongsTo = ChartOptionsDialog.getControl("OptionBelongsTo")
+		OptionRefersTo = ChartOptionsDialog.getControl("OptionRefersTo")
+		OptionFontList = ChartOptionsDialog.getControl("OptionFontList")
+		OptionFontSize = ChartOptionsDialog.Model.OptionFontSize ' getControl("OptionFontSize")	
+		OptionNoPositionsPersons = ChartOptionsDialog.getControl("OptionNoPositionsPersons")		
+		OptionNoPersons = ChartOptionsDialog.getControl("OptionNoPersons")
+		OptionPositionOwnsPerson = ChartOptionsDialog.getControl("OptionPositionOwnsPerson")
+		OptionNotPositionOwnsPerson = ChartOptionsDialog.getControl("OptionNotPositionOwnsPerson")
+		OptionPageSizeList = ChartOptionsDialog.getControl("OptionPageSizeList")
+		OptionOrgUnitColor = ChartOptionsDialog.getControl("OptionOrgUnitColor")
+		OptionPositionColor = ChartOptionsDialog.getControl("OptionPositionColor")
+		OptionPersonColor = ChartOptionsDialog.getControl("OptionPersonColor")
+		OptionRenderAsDotFile = ChartOptionsDialog.getControl("OptionRenderAsDotFile") 
+		OptionRenderAsDrawDocument = ChartOptionsDialog.getControl("OptionRenderAsDrawDocument") 
+
+		OptionDrawingBeautification  = ChartOptionsDialog.getControl("OptionDrawingBeautification")
+		OptionDrawingBeautificationEnergyThreshold = ChartOptionsDialog.getControl("OptionDrawingBeautificationEnergyThreshold")
+		OptionDrawingBeautificationCoefficientK = ChartOptionsDialog.getControl("OptionDrawingBeautificationCoefficientK")
+		OptionDrawingBeautificationCoefficientC = ChartOptionsDialog.getControl("OptionDrawingBeautificationCoefficientC")
+		OptionDrawingBeautificationDumping = ChartOptionsDialog.getControl("OptionDrawingBeautificationDumping")
+
+		
+		OptionPageWidth.Text = 118900
+		OptionPageHeight.Text = 84100
+		OptionNodeWidth.Text = 4000
+		OptionNodeHeight.Text = 1000
+		OptionBelongsTo.State = 1 'True
+		OptionRefersTo.State = 0 'False
+		OptionFontSize.Value = 11
+		OptionNoPersons.State = False 'False
+		OptionPositionOwnsPerson.State = False 'False
+		OptionNoPositionsPersons.State = True
+		OptionNotPositionOwnsPerson.State = False 'True
+		'Populate the organisations unit combo box (OptionOrganisationUnitToDraw)		
+		OrgUnitsSheet = CalcDoc.Sheets.getByName(ORGUNITS_SHEETNAME)
+		MaxRows = GetLastUsedRow(OrgUnitsSheet)
+		Dim OrgUnitsArray As Object
+		OrgUnitsArray = OrgUnitsSheet.GetCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 1, MaxRows).getDataArray()
+		For iIndex = 0 To UBound( OrgUnitsArray )
+			OptionOrganisationUnitToDraw.addItem( OrgUnitsArray(iIndex)(0) & ":" & OrgUnitsArray(iIndex)(1), OptionOrganisationUnitToDraw.getItemCount() )
+		Next iIndex
+		If UBound(OrgUnitsArray) > 0 Then
+			OptionOrganisationUnitToDraw.Text = OptionOrganisationUnitToDraw.getItem(0)	'OrgUnitsArray(0)(0) & ":" & OrgUnitsArray(0)(1)
+		End If
+		Dim FontArray(0) As String
+		'Remove duplicate font names from oFontDescriptors through copying unique strings in FontArray
+		For iIndex = LBound(oFontDescriptors) To UBound(oFontDescriptors) 
+	  		oFontDescriptor = oFontDescriptors(iIndex)
+	  		If FindStringInArray(oFontDescriptor.Name, FontArray) = -1 Then
+	  			FontArray(UBound(FontArray)) = oFontDescriptor.Name
+	  			FontArrayCount = UBound(FontArray)
+	  			ReDim Preserve FontArray(FontArrayCount+1) As String
+	  		End If
+		Next iIndex
+		For iIndex = 0 To UBound(FontArray)-1
+			OptionFontList.addItem(FontArray(iIndex), OptionFontList.getItemCount())
+		Next iIndex
+		If OptionFontList.getItemCount() > 0 Then
+			OptionFontList.Text = OptionFontList.getItem(0)
+		End If
+		Dim pageSizeList(10) As String
+		OptionPageSizeList.removeItems(0, 1)
+		pageSizeList = Array("A1", "A2", "A3", "A4", "A5", "A6", "B4", "B5", "B6", "Letter", "Legal")
+		OptionPageSizeList.addItems(pageSizeList, 0)
+		OptionPageSizeList.Text = "A3"
+		OptionOrgUnitColor.Model.BackgroundColor = DefaultOrgUnitBoxColor
+		OptionPersonColor.Model.BackgroundColor = DefaultPersonBoxColor
+		OptionPositionColor.Model.BackgroundColor = DefaultPositionBoxColor
+		
+		OptionRenderAsDrawDocument.State = True
+		OptionRenderAsDotFile.State = False
+		
+		OptionDrawingBeautificationEnergyThreshold.Text = CStr(30)
+		OptionDrawingBeautificationCoefficientK.Text = CStr(springK)
+		OptionDrawingBeautificationCoefficientC.Text = CStr(coulombC)
+		OptionDrawingBeautificationDumping.Text = CStr(dumpingConst)
+		
+		Call ActivateDeactivateBeautificationControls
+		
+		If OptionDrawingBeautification.State = 1 Then
+			DrawingBeautification = True
+			DrawingBeautificationEnergyThreshold = CDbl(OptionDrawingBeautificationEnergyThreshold.Text)
+			DrawingBeautificationCoefficientK = CDbl(OptionDrawingBeautificationCoefficientK.Text)
+			DrawingBeautificationCoefficientC = CDbl(OptionDrawingBeautificationCoefficientC.Text)
+			DrawingBeautificationDumping = CDbl(OptionDrawingBeautificationDumping.Text)	
+		Else
+			DrawingBeautification = False
+		End If
+		
+		Select Case ChartOptionsDialog.Execute()
+		Case 1
+		  MAX_PAGE_WIDTH = OptionPageWidth.Text
+		  MAX_PAGE_HEIGHT = OptionPageHeight.Text
+		  NODE_WIDTH = OptionNodeWidth.Text
+		  NODE_HEIGHT = OptionNodeHeight.Text
+		  NODE_FONT_SIZE = OptionFontSize.Value
+		  NODE_FONT_NAME = OptionFontList.Text
+		  PersonBoxColor = OptionPersonColor.Model.BackgroundColor
+		  PositionBoxColor = OptionPositionColor.Model.BackgroundColor
+		  OrgUnitBoxColor = OptionOrgUnitColor.Model.BackgroundColor	
+		  
+		  DRAW_POSITIONS = True
+		  If OptionBelongsTo.State = 1 Then 
+		  	DrawBelongsToRelationships = True 
+		  Else 
+		  	DrawBelongsToRelationships = False
+		  End If
+  		  If OptionRefersTo.State = 1 Then 
+  		  	DrawRefersToRelationships = True 
+  		  Else 
+  		  	DrawRefersToRelationships = False 
+  		  End If
+  		  If OptionNoPersons.State = True Then
+  		  	DRAW_PERSONS = False
+  		  Else
+  		  	DRAW_PERSONS = True
+  		  End If
+  		  If OptionPositionOwnsPerson.State = True Then
+  		  	POSITION_OWNS_PERSON = True
+  		  End If
+  		  If OptionNotPositionOwnsPerson.State = True Then
+  		  	POSITION_OWNS_PERSON = False
+	  	  End If
+  		  If OptionNoPositionsPersons.State = True Then
+  		  	DRAW_PERSONS = False
+  		  	DRAW_POSITIONS = False
+  		  End If
+  		  If OptionRenderAsDrawDocument.State = True Then
+  		  	DrawingRenderAsSelection = 1
+  		  ElseIf OptionRenderAsDotFile.State = True Then
+  		  	DrawingRenderAsSelection = 2
+  		  End If
+		  If OptionDrawingBeautification.State = 1 Then
+		  	DrawingBeautification = True
+			DrawingBeautificationEnergyThreshold = CDbl(OptionDrawingBeautificationEnergyThreshold.Text)
+			DrawingBeautificationCoefficientK = CDbl(OptionDrawingBeautificationCoefficientK.Text)
+			DrawingBeautificationCoefficientC = CDbl(OptionDrawingBeautificationCoefficientC.Text)
+			DrawingBeautificationDumping = CDbl(OptionDrawingBeautificationDumping.Text)	
+		  Else
+		 	DrawingBeautification = False
+		  End If
+
+		  If  OptionOrganisationUnitToDraw.Text <> "" Then
+		  	Call DrawCompactOrganisationChart(OptionOrganisationUnitToDraw.Text)
+		  Else
+		  	Call DrawCompactOrganisationChart(OrgUnitsArray(0)(0) & ":" & OrgUnitsArray(0)(1))
+		  End If
+		
+		Case 0 
+		  'MsgBox "Cancel pressed"
+		End Select
+	End If
+End Sub
+
+Sub ActivateDeactivateBeautificationControls
+	OptionDrawingBeautification  = ChartOptionsDialog.getControl("OptionDrawingBeautification")
+	OptionDrawingBeautificationEnergyThreshold = ChartOptionsDialog.getControl("OptionDrawingBeautificationEnergyThreshold")
+	OptionDrawingBeautificationCoefficientK = ChartOptionsDialog.getControl("OptionDrawingBeautificationCoefficientK")
+	OptionDrawingBeautificationCoefficientC = ChartOptionsDialog.getControl("OptionDrawingBeautificationCoefficientC")
+	OptionDrawingBeautificationDumping = ChartOptionsDialog.getControl("OptionDrawingBeautificationDumping")
+	OptionDrawingBeautificationEnergyThresholdLabel = ChartOptionsDialog.getControl("OptionDrawingBeautificationEnergyThresholdLabel")
+	OptionDrawingBeautificationCoefficientKLabel = ChartOptionsDialog.getControl("OptionDrawingBeautificationCoefficientKLabel")
+	OptionDrawingBeautificationCoefficientCLabel = ChartOptionsDialog.getControl("OptionDrawingBeautificationCoefficientCLabel")
+	OptionDrawingBeautificationDumpingLabel = ChartOptionsDialog.getControl("OptionDrawingBeautificationDumpingLabel")
+
+	If OptionDrawingBeautification.State = 1 Then
+		OptionDrawingBeautificationEnergyThreshold.Model.Enabled = True
+		OptionDrawingBeautificationEnergyThresholdLabel.Model.Enabled = True
+		OptionDrawingBeautificationCoefficientK.Model.Enabled = True
+		OptionDrawingBeautificationCoefficientKLabel.Model.Enabled = True
+		OptionDrawingBeautificationCoefficientC.Model.Enabled = True
+		OptionDrawingBeautificationCoefficientCLabel.Model.Enabled = True
+		OptionDrawingBeautificationDumping.Model.Enabled = True
+		OptionDrawingBeautificationDumpingLabel.Model.Enabled = True
+	Else
+		OptionDrawingBeautificationEnergyThreshold.Model.Enabled = False
+		OptionDrawingBeautificationEnergyThresholdLabel.Model.Enabled = False
+		OptionDrawingBeautificationCoefficientK.Model.Enabled = False
+		OptionDrawingBeautificationCoefficientKLabel.Model.Enabled = False
+		OptionDrawingBeautificationCoefficientC.Model.Enabled = False
+		OptionDrawingBeautificationCoefficientCLabel.Model.Enabled = False
+		OptionDrawingBeautificationDumping.Model.Enabled = False
+		OptionDrawingBeautificationDumpingLabel.Model.Enabled = False
+	End If
+End Sub
+
+
+Sub ChangePageSize
+	OptionPageSizeList = ChartOptionsDialog.getControl("OptionPageSizeList")
+	OptionPageWidth = ChartOptionsDialog.getControl("OptionPageWidth")
+	OptionPageHeight = ChartOptionsDialog.getControl("OptionPageHeight")
+	'	pageSizeList = Array("A1", "A2", "A3", "A4", "A5", "A6", "B4", "B5", "B6", "Letter", "Legal")
+
+	Select Case OptionPageSizeList.Text
+	Case "A6"
+		OptionPageWidth.Text = 14800
+		OptionPageHeight.Text = 10500
+	Case "A5"
+		OptionPageWidth.Text = 21000
+		OptionPageHeight.Text = 14800
+	Case "A4"
+		OptionPageWidth.Text = 29700
+		OptionPageHeight.Text = 21000
+	Case "A3"
+		OptionPageWidth.Text = 42000
+		OptionPageHeight.Text = 29700
+	Case "A2"
+		OptionPageWidth.Text = 59400
+		OptionPageHeight.Text = 42000
+	Case "A1"
+		OptionPageWidth.Text = 84100
+		OptionPageHeight.Text = 59400
+	Case "B4"
+		OptionPageWidth.Text = 36400
+		OptionPageHeight.Text = 25700
+	Case "B5"
+		OptionPageWidth.Text = 25700
+		OptionPageHeight.Text = 18200
+	Case "B6"
+		OptionPageWidth.Text = 17600
+		OptionPageHeight.Text = 12500
+	Case "Legal"
+		OptionPageWidth.Text = 35600
+		OptionPageHeight.Text = 21600
+	Case "Letter"
+		OptionPageWidth.Text = 27900
+		OptionPageHeight.Text = 21600
+	End Select
+End Sub
+
+Sub InitializeColorPickerDialog(Event As Object)
+	DialogLibraries.LoadLibrary("Standard")
+	ColorPickerDialog = CreateUnoDialog(DialogLibraries.Standard.ColorPickerDialog)
+	ColorPickerDialog.Execute()
+	If NOT IsNull(Event.Source) Then
+		Event.Source.Model.BackgroundColor = PickedColor
+	End If
+	ColorPickerDialog.Dispose()
+	'Print PickedColor
+End Sub
+
+
+Sub ChangeRGBColorToColorPickerButton
+	OptionColorPicker = ColorPickerDialog.getControl("OptionColorPicker")
+	OptionRedBar = ColorPickerDialog.getControl("OptionRedBar")
+	OptionGreenBar = ColorPickerDialog.getControl("OptionGreenBar")
+	OptionBlueBar = ColorPickerDialog.getControl("OptionBlueBar")
+	
+	OptionColorPicker.Model.BackgroundColor = RGB(OptionRedBar.getValue(), OptionGreenBar.getValue(), OptionBlueBar.getValue())
+End Sub
+
+
+Sub PickColorByRGBColorCode
+	OptionColorPicker = ColorPickerDialog.getControl("OptionColorPicker")
+	PickedColor = OptionColorPicker.Model.BackgroundColor	
+	ColorPickerDialog.endExecute()
+End Sub
+
+Sub PickColorByDirectSelection(Event As Object)
+	'Print Event.Source.Model.Name
+	PickedColor = Event.Source.Model.BackgroundColor	
+	ColorPickerDialog.endExecute()
+End Sub
+
+
+'recursive function through which we traverse a hierarchical tree, going to all leaves and then 
+' store the leaves in a Nodes array and all relations (to their parents) to connectors array
+Sub findChildrenOf(unitArray As Object, findThis As String, relationshipColumn As Integer, arrayName As String, optional parent As String, optional recursionDepth As Integer )
+
+'recursionDepth counts the levels of recursion, and stops when this is more than MAX_ORGANISATION_UNITS_TREE_DEPTH,
+' a constant, meaning that there is a cyclical reference between cells. 
+' The sub will exit when recursionDepth >= MAX_ORGANISATION_UNITS_TREE_DEPTH
+
+	Dim rowCounter As Long
+	Dim nextToFind As String
+	Dim parentNode As String
+	
+	'unitArray should be 2-dimentional, as coming from getDataArray method of a CellRange
+	If IsMissing(recursionDepth) Then
+		recursionDepth = 0
+	End If
+	If NOT IsNull(unitArray) Then
+		parentNode = findThis
+		For rowCounter = 0 to UBound(unitArray)
+			'Split multi-value delimited cells in parts, and browse through all parts
+			Dim DelimitedStringLeft As String
+			DelimitedStringLeft = unitArray(rowCounter)(relationshipColumn)
+			Do While DelimitedStringLeft <> ""
+				If FindFirstIn(DelimitedStringLeft) = findThis Then
+					nextToFind = unitArray(rowCounter)(0) & ":" & unitArray(rowCounter)(1)
+					If NOT IsMissing(recursionDepth) Then
+						If recursionDepth < MAX_ORGANISATION_UNITS_TREE_DEPTH Then
+							findChildrenOf(unitArray, nextToFind, relationshipColumn, arrayName, findThis, recursionDepth +1)	'now define the parent-findThis for the next iteration
+						End If
+					Else
+						findChildrenOf(unitArray, nextToFind, relationshipColumn, arrayName, findThis, 1)	'now define the parent-findThis for the next iteration					
+					End If
+				End If
+				DelimitedStringLeft = ReturnNextOf(DelimitedStringLeft)
+			Loop
+
+			
+		Next rowCounter
+		'We have a tree leaf! Store this away but only if it is not in the respective array already
+		If arrayName = "organisation units" AND FindStringInArray(findThis, orgUnitNodes) = -1 Then
+			orgUnitNodesCount = UBound(orgUnitNodes)
+			orgUnitNodes(orgUnitNodesCount,0) = findThis
+			orgUnitNodes(orgUnitNodesCount,1) = recursionDepth
+			ReDim Preserve orgUnitNodes(orgUnitNodesCount+1,1) As String
+		Elseif arrayName = "positions" AND FindStringInArray(findThis, positionNodes) = -1 Then
+			positionNodesCount = UBound(positionNodes)
+			positionNodes(positionNodesCount) = findThis
+			ReDim Preserve positionNodes(positionNodesCount +1) As String
+		Elseif arrayName = "persons" Then
+		End If
+		If NOT IsMissing(parent) Then
+			nodeConnectorsCount = UBound(nodeConnectors)
+			nodeConnectors(nodeConnectorsCount, 0) = parent
+			nodeConnectors(nodeConnectorsCount, 1) = findThis
+			nodeConnectors(nodeConnectorsCount, 2) = "belongsTo"
+			ReDim Preserve nodeConnectors(nodeConnectorsCount+1, 2) As String
+		End If
+	End If
+End Sub
+
+Sub drawNodes(nodeArray() As String, shapeArray As Object, nodeHeight As Long, Optional fillColor As Long, Optional radius As Boolean)
+	Dim NodeMargin As Long
+	Dim nodeCount As Long
+	
+	nodeCount = UBound(nodeArray)-1		'the last array element is always not used
+	If IsNull(drawDoc) OR nodeCount < 0 Then
+		Exit Sub
+	End If
+	ReDim Preserve shapeArray( nodeCount ) As Object
+	NodeMargin = (MAX_PAGE_WIDTH - MAX_PAGE_BORDER_LEFT - MAX_PAGE_BORDER_RIGHT) \ (nodeCount+1)
+	If IsMissing(fillColor) Then
+		fillColor = OrgUnitBoxColor
+	End If
+	If IsMissing(radius) Then
+		radius = False
+	End If
+	For j = 0 To nodeCount 	
+		shapeArray(j) = drawNode( nodeArray(j), MAX_PAGE_BORDER_LEFT + (j+1)*NodeMargin - (NodeMargin\2) - (NODE_WIDTH\2), _
+		nodeHeight, NODE_WIDTH, NODE_HEIGHT, fillColor, radius )
+	Next j
+End Sub
+
+Function drawNode(nodeName As String, nodeLeft As Long, nodeTop As Long, nodeWidth As Long, nodeHeight As Long, fillColor As Long, radius As Boolean) As Object
+	Dim drawShape As Object
+	
+	'Assuming that we only draw our organisation chart on the first page of the new Draw document
+	drawPage = drawDoc.getDrawPages().getByIndex( 0 )
+	drawShape = MakeRectangleShape( drawDoc, MakePoint( nodeLeft, nodeTop ), MakeSize( nodeWidth, nodeHeight ) )			
+	Dim Gradient As New com.sun.star.awt.Gradient
+	Gradient.Style = com.sun.star.awt.GradientStyle.LINEAR
+	Gradient.StartColor = fillColor
+	Gradient.EndColor = RGB(255,255,255)
+	Gradient.StartIntensity = 100   
+	Gradient.EndIntensity = 100
+	Gradient.Angle = 0
+	Gradient.StepCount = 20
+	drawShape.FillStyle = com.sun.star.drawing.FillStyle.GRADIENT
+	drawShape.FillGradient = Gradient	
+	drawPage.add( drawShape )
+	drawShape.TextAutoGrowWidth = TRUE
+	drawShape.TextAutoGrowHeight =  TRUE
+	If STRING_WRAPPING = True Then
+		drawShape.SetString( WrapString( nodeName ) )
+	Else
+		drawShape.SetString( nodeName )
+	End If
+	drawShape.CharFontName = NODE_FONT_NAME
+	drawShape.CharHeight = NODE_FONT_SIZE
+	'drawShape.FillColor = fillColor
+	If radius = True Then
+		drawShape.CornerRadius = 300
+	End If
+	'drawShape.TextAnimationDirection = com.sun.star.drawing.TextAnimationDirection.RIGHT
+	'drawShape.TextAnimationKind = com.sun.star.drawing.TextAnimationKind.SCROLL
+	drawNode() = drawShape
+End Function
+
+Sub DrawCompactOrganisationChart( organisationUnitToDraw As String )
+	Dim CalcDoc As Object
+	Dim OrgUnitsSheet As Object
+	Dim PositionsSheet As Object
+	Dim PersonsSheet As Object
+	Dim OrgUnitsArray
+	Dim PositionsArray
+	Dim PersonsArray
+	
+	CalcDoc = ThisComponent
+	'To find related Persons, OrgUnits or Positions from Positions, use function MATCH
+
+	If ValidateOrganisationChartData = 0 Then
+		
+		OrgUnitsSheet = CalcDoc.Sheets.getByName(ORGUNITS_SHEETNAME)
+		MaxRows = GetLastUsedRow(OrgUnitsSheet)
+		OrgUnitsArray = OrgUnitsSheet.GetCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 2, MaxRows).getDataArray()
+		PositionsSheet = CalcDoc.Sheets.getByName(POSITIONS_SHEETNAME)
+		MaxRows = GetLastUsedRow(PositionsSheet)
+		If MaxRows > HEADER_ROWS_PER_SHEET Then
+			PositionsArray = PositionsSheet.GetCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 4, MaxRows).getDataArray()
+		End If
+		PersonsSheet = CalcDoc.Sheets.getByName(PERSONS_SHEETNAME)
+		MaxRows = GetLastUsedRow(PersonsSheet)
+		If MaxRows > HEADER_ROWS_PER_SHEET Then
+			PersonsArray = PersonsSheet.GetCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 2, MaxRows).getDataArray()
+		End If
+		
+		'Now explore the tree of hierarchy of organisation units by a recursive function and build the nodes and connectors
+		Call findChildrenOf(OrgUnitsArray, organisationUnitToDraw, 2, "organisation units")	'search in the 3rd column (2nd for a 0-based index) for the BelongsTo relationship
+		'If we would like to include orphan nodes, not belonging to the tree of organisationUnitToDraw, then we would have to
+		'browse the orgUnitNodes and pick from OrgUnitsArray those that are not included already in orgUnitNodes.
+		Dim organisationName As String
+		organisationName =  OrgUnitsArray(0)(0) & ":" & OrgUnitsArray(0)(1)
+		If organisationUnitToDraw = organisationName Then
+			For j = 0 To UBound(OrgUnitsArray)
+				organisationName =  OrgUnitsArray(j)(0) & ":" & OrgUnitsArray(j)(1)
+				If FindStringInArray(organisationName, orgUnitNodes) = -1 Then
+					Call findChildrenOf(OrgUnitsArray, organisationName, 2, "organisation units")
+				End If
+			Next j
+		End If
+		
+		'For all organisation unit nodes, find their relation to positions
+		If NOT IsEmpty(PositionsArray) Then
+			For j = 0 To UBound(PositionsArray)
+				For k = 0 To UBound(orgUnitNodes) - 1
+					If PositionsArray(j)(2) <>"" AND PositionsArray(j)(2) = orgUnitNodes(k,0) Then
+						If  DrawBelongsToRelationships = True Then
+							'found a "BelongsTo" related position, now store it to positionNodes nodes String array
+							If  FindStringInArray(PositionsArray(j)(0) & ":" & PositionsArray(j)(1), positionNodes) = -1 Then
+								positionNodesCount = UBound(positionNodes)
+								positionNodes(positionNodesCount) = PositionsArray(j)(0) & ":" & PositionsArray(j)(1)	'orgUnitNodes(k)
+								'increase positionNode array size
+								ReDim Preserve positionNodes( positionNodesCount +1 ) As String
+							End If
+							'Now, add the connectors to nodeConnectors String array
+							nodeConnectorsCount = UBound(nodeConnectors)
+							nodeConnectors(nodeConnectorsCount, 0) = orgUnitNodes(k,0)
+							nodeConnectors(nodeConnectorsCount, 1) = PositionsArray(j)(0) & ":" & PositionsArray(j)(1)
+							nodeConnectors(nodeConnectorsCount, 2) = "belongsTo"
+							ReDim Preserve nodeConnectors(nodeConnectorsCount+1, 2) As String
+						End If
+						If DrawRefersToRelationships = True Then
+							If PositionsArray(j)(4) <>"" Then
+								'found a "RefersTo" related position, now store it to positionNodes nodes String array, if not already in there
+											'Split multi-value delimited cells in parts, and browse through all parts
+								Dim delimitedStringLeft As String, delimitedStringFound As String
+								delimitedStringLeft = PositionsArray(j)(4)
+								Do While delimitedStringLeft <> ""
+									delimitedStringFound = FindFirstIn(delimitedStringLeft)
+									If FindStringInArray(delimitedStringFound, positionNodes) = -1 Then 'not found
+										positionNodesCount = UBound(positionNodes)
+										positionNodes(positionNodesCount) = delimitedStringFound
+										'positionNodes(positionNodesCount) = PositionsArray(j)(0) & ":" & PositionsArray(j)(1)	'orgUnitNodes(k)
+										'increase positionNode array size
+										ReDim Preserve positionNodes( positionNodesCount +1 ) As String
+									End If
+									'Now search for PositionsArray(j)(0) & ":" & PositionsArray(j)(1), and if not found, add it as well
+									If FindStringInArray(PositionsArray(j)(0) & ":" & PositionsArray(j)(1), positionNodes) = -1 Then
+										positionNodesCount = UBound(positionNodes)
+										positionNodes(positionNodesCount) = PositionsArray(j)(0) & ":" & PositionsArray(j)(1)
+										'increase positionNode array size
+										ReDim Preserve positionNodes( positionNodesCount +1 ) As String
+									End If
+									'Now, add the connectors to nodeConnectors String array
+									nodeConnectorsCount = UBound(nodeConnectors)
+									nodeConnectors(nodeConnectorsCount, 0) = delimitedStringFound
+									nodeConnectors(nodeConnectorsCount, 1) = PositionsArray(j)(0) & ":" & PositionsArray(j)(1)
+									nodeConnectors(nodeConnectorsCount, 2) = "refersTo"
+									ReDim Preserve nodeConnectors(nodeConnectorsCount+1, 2) As String
+									
+									delimitedStringLeft = ReturnNextOf(delimitedStringLeft)
+								Loop
+							End If
+						End If
+						'now store the person attached to (belonging to) the found position in personNodes nodes array
+						If PositionsArray(j)(3) <>"" Then
+							Dim foundPerson As String
+							foundPerson = ""
+							If POSITION_OWNS_PERSON = False Then					
+								'search personNodes if this Node exists already
+								For m = 0 To UBound(personNodes) - 1
+									If personNodes(m) = PositionsArray(j)(3) Then
+										foundPerson = personNodes(m)
+										Exit For
+									End If
+								Next m
+							End If
+							'Now, add the connectors to nodeConnectors String array
+							nodeConnectorsCount = UBound(nodeConnectors)
+							If foundPerson="" Then
+								personNodesCount = UBound(personNodes)
+								personNodes(personNodesCount) = PositionsArray(j)(3)
+								ReDim Preserve personNodes(personNodesCount +1) As String
+								nodeConnectors(nodeConnectorsCount, 1) = PositionsArray(j)(3) 
+							Else
+								nodeConnectors(nodeConnectorsCount, 1) = foundPerson
+							End If
+							nodeConnectors(nodeConnectorsCount, 0) = PositionsArray(j)(0) & ":" & PositionsArray(j)(1)
+							nodeConnectors(nodeConnectorsCount, 2) = "worksAs" 'special relationship between persons occupying positions (working as positions' role)
+							ReDim Preserve nodeConnectors(nodeConnectorsCount+1, 2) As String
+						End If
+					End If
+				Next k
+			Next j
+		End If 'PositionsArray is not null
+	End If 'validate data
+
+
+	If DrawingRenderAsSelection = 1 Then
+		Call DrawOrganisationShapes( organisationUnitToDraw )
+	ElseIf DrawingRenderAsSelection = 2 Then
+		Call SaveDotFile(OrganisationChartDotFileName)
+	End If
+End Sub
+
+Sub SetPageSize(oDoc, nWidth, nHeight)
+  aURL = CreateUnoStruct("com.sun.star.util.URL")
+  aURL.Complete = ".uno:PageSize"
+  CreateUnoService("com.sun.star.util.URLTransformer").parseStrict(aURL, True)
+  oDisp = oDoc.getCurrentController().queryDispatch(aURL, "_self", 0)
+  If NOT IsNull(oDisp) Then
+    Dim args(2) As New com.sun.star.beans.PropertyValue
+    args(0).Name = "PageWidth"
+    args(0).Value = nWidth
+    args(1).Name = "PageHeight"
+    args(1).Value = nHeight
+    args(2).Name = "ScaleObjects"
+    args(2).Value = False
+    oDisp.dispatch(aURL, args)
+  End If
+End Sub
+
+
+'The following function saves the shapes and connectors arrays into a dot representation in a .dot file
+'open dot files through http://graph.gafol.net rendered as SVG and saved as image files
+
+Sub SaveDotFile
+	On Error Goto ErrorHandler
+	Dim dotFile As Integer
+	Dim skipThisConnector As Boolean
+	Dim OrganisationChartDotFileName As String
+
+	OrganisationChartDotFileName = SelectFolder("", "Αποθήκευση οργανογράμματος ως αρχείο dot")
+	If Right(OrganisationChartDotFileName, 1) <> "/" Then
+		OrganisationChartDotFileName = OrganisationChartDotFileName & "/"
+	End If
+	OrganisationChartDotFileName = OrganisationChartDotFileName & "OrganisationChart_" & Format(Date, "D-M-YYYY") & "_" & ReplaceString(Time, ":", "-") & ".dot"
+	dotFile = Freefile
+	Open ConvertFromURL(OrganisationChartDotFileName) For Output As #dotFile
+	Print #dotFile, "digraph OrganisationGraph {"
+	Print #dotFile, "node [shape=box,style=rounded];"
+	relationsNumber = UBound(nodeConnectors) -1
+	orgUnitsNumber = UBound(OrgUnitNodes) -1
+	If orgUnitsNumber >= 0 Then
+		'ReDim Relations(relationsCount) As Object
+		For j = 0 To orgUnitsNumber
+			skipThisConnector = False
+			If DRAW_POSITIONS = False AND DRAW_PERSONS = False Then
+			'find all connected Positions, and for them, all connceted Persons
+				OrgUnitDotString = """" & OrgUnitNodes(j,0) & """ [style=""filled, rounded"" fillcolor=""#" & FormatHex(OrgUnitBoxColor) & """ shape=Mrecord label=<<table border=""0""><tr><td bgcolor=""black"" align=""center"" colspan=""2""><font color=""white"">" & OrgUnitNodes(j,0) & "</font></td></tr>"
+				If relationsNumber >= 0 Then
+					'ReDim Relations(relationsCount) As Object
+					For k = 0 To relationsNumber
+						if nodeConnectors(k,0) = OrgUnitNodes(j,0) Then
+'    node01 [style="filled, rounded" fillcolor="#FFFF99" shape=Mrecord label=<<table border="0"><tr><td bgcolor="black" align="center" colspan="2"><font color="white">01:Δήμαρχος</font></td></tr><tr><td border="0">Καλαμαρίδης Ηλίας</td></tr></table>>];
+							relatedPosition = FindStringInArray(nodeConnectors(k, 1), PositionNodes)
+							If relatedPosition <> -1 Then 'found it
+								If FindStringInArray(nodeConnectors(k, 1), PositionNodes) <> -1 Then 'now find the connected position
+									'now find the person in that position
+									For l = 0 To relationsNumber
+										If nodeConnectors(l,0) = PositionNodes(relatedPosition) AND FindStringInArray(nodeConnectors(l, 1), PersonNodes) <> -1 Then
+											OrgUnitDotString = OrgUnitDotString & "<tr><td border=""0"">" & nodeConnectors(l, 1) & "</td></tr>"	'</table>>]
+										End If
+									Next l
+								End If
+							End If
+						End If
+					Next k
+					OrgUnitDotString = OrgUnitDotString & "</table>>]"
+					Print #dotFile, OrgUnitDotString
+				End If
+				skipThisConnector = True 'do not print this node as below, it is already included
+			End If
+			If skipThisConnector = False Then
+					Print #dotFile, """" & OrgUnitNodes(j,0) & """ [style=""filled,rounded"", color=""#" & FormatHex(OrgUnitBoxColor) & """];" '[node [shape=box,style=filled,color=".7 .3 1.0"];				
+			End If
+		Next j
+	End If
+	If relationsNumber >= 0 Then
+		'ReDim Relations(relationsCount) As Object
+		For j = 0 To relationsNumber
+			skipThisConnector = False
+			If DRAW_PERSONS = False AND FindStringInArray(nodeConnectors(j, 1), PersonNodes) <> -1 Then
+				skipThisConnector = True
+			End If
+			If (DrawBelongsToRelationships = True AND nodeConnectors(j, 2) <> "belongsTo" AND nodeConnectors(j, 2) <> "worksAs") OR _
+				(DrawRefersToRelationships = True AND nodeConnectors(j, 2) <> "refersTo" AND nodeConnectors(j, 2) <> "worksAs") Then
+				skipThisConnector = True
+			End If
+			If skipThisConnector = False Then
+'				If FindStringInArray(nodeConnectors(j, 0), OrgUnitNodes) <> -1 Then
+'					Print #dotFile, """" & nodeConnectors(j, 0) & """ [style=filled, color=""#" & FormatHex(OrgUnitBoxColor) & """];" '[node [shape=box,style=filled,color=".7 .3 1.0"];
+'				Else
+				if DRAW_POSITIONS = True AND FindStringInArray(nodeConnectors(j, 0), PositionNodes) <> -1 Then
+					Print #dotFile, """" & nodeConnectors(j, 0) & """ [style=""filled,rounded"", color=""#" & FormatHex(PositionBoxColor) & """];" 
+				Elseif DRAW_PERSONS = True AND FindStringInArray(nodeConnectors(j, 0), PersonNodes) <> -1 Then
+					Print #dotFile, """" & nodeConnectors(j, 0) & """ [style=""filled,rounded"", color=""#" & FormatHex(PersonBoxColor) & """];" 
+				End If
+'				If FindStringInArray(nodeConnectors(j, 1), OrgUnitNodes) <> -1 Then
+'					Print #dotFile, """" & nodeConnectors(j, 1) & """ [style=filled, color=""#" & FormatHex(OrgUnitBoxColor) & """];" '[node [shape=box,style=filled,color=".7 .3 1.0"];
+'				Else
+				if DRAW_POSITIONS = True AND FindStringInArray(nodeConnectors(j, 1), PositionNodes) <> -1 Then
+					Print #dotFile, """" & nodeConnectors(j, 1) & """ [style=""filled,rounded"", color=""#" & FormatHex(PositionBoxColor) & """];" 
+				Elseif DRAW_PERSON = True AND FindStringInArray(nodeConnectors(j, 1), PersonNodes) <> -1 Then
+					If POSITION_OWNS_PERSON = True Then
+						Print #dotFile, """Person" & j & """ [label=""" & nodeConnectors(j, 1) & """, style=filled, color=""#" & FormatHex(PersonBoxColor) & """];" 
+					Else
+						Print #dotFile, """" & nodeConnectors(j, 1) & """ [style=""filled,rounded"", color=""#" & FormatHex(PersonBoxColor) & """];" 
+					End If
+				End If
+				If FindStringInArray(nodeConnectors(j, 1), PersonNodes) <> -1 AND POSITION_OWNS_PERSON = True Then
+					Print #dotFile, """" & nodeConnectors(j, 0) & """ -> ""Person" & j & """;"				
+				ElseIf ( (FindStringInArray(nodeConnectors(j, 0), PositionNodes) <> -1 OR _
+						FindStringInArray(nodeConnectors(j, 1), PositionNodes) <> -1) AND DRAW_POSITIONS = True) OR _
+						(FindStringInArray(nodeConnectors(j, 0), OrgUnitNodes) <> -1 AND FindStringInArray(nodeConnectors(j, 1), OrgUnitNodes) <> -1) Then
+					Print #dotFile, """" & nodeConnectors(j, 0) & """ -> """ & nodeConnectors(j, 1) & """;"
+				End If
+			End If
+		Next j
+	End If
+	Print #dotFile, "}"
+	Close #dotFile
+
+	ErrorHandler: 
+		If Err Then
+			MsgBox "Σφάλμα Νο" & Err & ": " & Error$, "Σφάλμα"
+		End If
+End Sub
+
+
+'Adds that many zeros in front of colorCode, so as the total length is 6 hex characters
+
+Function FormatHex(colorCode As Long) As String
+	Dim hexString As String
+	
+	hexString = Hex(colorCode)
+	For j = 0 To 5-Len(hexString)
+		hexString = "0" & hexString
+	Next j
+	FormatHex = hexString
+End Function
+
+Sub DrawOrganisationShapes( organisationUnitToDraw As String )
+	On Error Goto ErrorHandler
+	Dim OrgUnits(0) As Object
+	Dim Persons(0) As Object
+	Dim Positions(0) As Object
+	Dim Relations(0) As Object
+
+
+	If (UBound(OrgUnitNodes) > 0) Then 
+		drawDoc = StarDesktop.loadComponentFromURL( "private:factory/sdraw", "_blank", 0, Array() )
+		
+		
+		If drawDoc.supportsService("com.sun.star.drawing.DrawingDocument") Then 
+	        Dim oDocSettings as Object 
+	        oDocSettings = drawDoc.createInstance("com.sun.star.document.Settings") 
+	        oDocSettings.setPropertyValue("IsPrintFitPage", False) 
+	        oDocSettings.setPropertyValue("IsPrintTilePage", True) 	        
+		End If 
+ 			
+		drawPage = drawDoc.getDrawPages().getByIndex( 0 )
+		'drawPage.setPropertyValue("Height", MAX_PAGE_HEIGHT) 
+		'drawPage.setPropertyValue("Width", MAX_PAGE_WIDTH) 
+		
+		'Orientation can be com.sun.star.view.PaperOrientation.PORTRAIT or com.sun.star.view.PaperOrientation.LANDSCAPE
+		drawPage.Orientation = com.sun.star.view.PaperOrientation.LANDSCAPE
+		drawPage.BorderTop = MAX_PAGE_BORDER_TOP
+		drawPage.BorderRight = MAX_PAGE_BORDER_RIGHT
+		drawPage.BorderLeft = MAX_PAGE_BORDER_LEFT
+		drawPage.BorderBottom = MAX_PAGE_BORDER_BOTTOM
+
+		'Resize default DrawPage
+		drawPage.Width = MAX_PAGE_WIDTH
+		drawPage.Height = MAX_PAGE_HEIGHT
+		
+	   'Dim PrinterProperties(2) AS NEW com.sun.star.beans.PropertyValue 
+	   'PrinterProperties(0).Name = "PaperSize" 
+	   'PrinterProperties(0).Value = MakeSize(MAX_PAGE_WIDTH, MAX_PAGE_HEIGHT) 
+	   'PrinterProperties(1).Name = "PaperOrientation" 
+	   'PrinterProperties(1).Value = com.sun.star.view.PaperOrientation.LANDSCAPE
+	   'PrinterProperties(2).Name = "DocumentZoomType" 
+	   'PrinterProperties(2).Value = com.sun.star.view.DocumentZoomType.ENTIRE_PAGE
+	   
+	   'drawDoc.Printer = PrinterProperties()
+
+		'Call SetPageSize(drawDoc, drawPage.Width, drawPage.Height)
+			
+		'Now that we have got the 4 arrays populated (orgUnitNodes, positionNodes, personNodes, nodeConnectors)
+		'we may start drawing the elements into shapes and connectors in the first Draw page (drawPage object)
+		If DrawBelongsToRelationships = True Then
+			Call drawNodes(orgUnitNodes, OrgUnits, 2*MAX_PAGE_HEIGHT\5, OrgUnitBoxColor, True, True)
+		End If
+		If UBound(positionNodes) > 0 Then
+			Call drawNodes(positionNodes, Positions, 3*MAX_PAGE_HEIGHT\5, PositionBoxColor, True, True)
+		End If
+		If UBound(personNodes) > 0 AND POSITION_OWNS_PERSON = False AND DRAW_PERSONS = True Then
+			Call drawNodes(personNodes, Persons, 4*MAX_PAGE_HEIGHT\5, PersonBoxColor, True, True)
+		End If
+		'Draw connectors
+		Dim relationsNumber As Long, relationsCount As Long
+		Dim fromShape, toShape
+		relationsNumber = UBound(nodeConnectors) -1
+		If relationsNumber >= 0 Then
+			'ReDim Relations(relationsCount) As Object
+			For j = 0 To relationsNumber
+				fromShape = Nothing
+				toShape = Nothing
+				fromShape = GetFromShapeArray(nodeConnectors(j,0), OrgUnits)
+				If IsNull(fromShape) Then
+					fromShape = GetFromShapeArray(nodeConnectors(j,0), Positions)
+					If IsNull(fromShape) AND DRAW_PERSONS = True Then
+						If POSITION_OWNS_PERSON = True Then
+							'fromShape = drawNode( nodeConnectors(j,0), MAX_PAGE_BORDER_LEFT, MAX_PAGE_BORDER_TOP, NODE_WIDTH, NODE_HEIGHT, PersonBoxColor, True)
+						Else
+							fromShape = GetFromShapeArray(nodeConnectors(j,0), Persons)
+						End If
+					End If
+				End If
+				toShape =  GetFromShapeArray(nodeConnectors(j,1), OrgUnits)
+				If IsNull(toShape) Then
+					toShape = GetFromShapeArray(nodeConnectors(j,1), Positions)
+					If IsNull(toShape) AND DRAW_PERSONS = True Then
+						If POSITION_OWNS_PERSON = True Then
+							If NOT IsNull(fromShape) Then
+								toShape = drawNode( nodeConnectors(j,1), fromShape.Position.X, 4*MAX_PAGE_HEIGHT\5, fromShape.Size.Width, fromShape.Size.Height, PersonBoxColor, True)					
+								personsCount = UBound(Persons)
+								If personsCount <> 0 OR (NOT IsNull(Persons(0))) Then
+									personsCount = personsCount + 1
+									ReDim Preserve Persons(personsCount) As Object
+								End If
+								Persons(personsCount) = toShape
+							Else
+								'toShape = drawNode( nodeConnectors(j,1), MAX_PAGE_BORDER_LEFT, MAX_PAGE_BORDER_TOP, NODE_WIDTH, NODE_HEIGHT, PersonBoxColor, True)					
+							End If
+						Else
+							toShape = GetFromShapeArray(nodeConnectors(j,1), Persons)
+						End If
+					End If
+				End If
+				If Not IsNull(toShape) AND NOT IsNull(fromShape) Then
+					If (nodeConnectors(j,2) = "belongsTo" AND DrawBelongsToRelationships = True) OR _
+						(nodeConnectors(j,2) = "refersTo" AND DrawRefersToRelationships = True) OR _
+						(nodeConnectors(j,2) = "worksAs" AND DRAW_PERSONS = True) Then
+						relationsCount = UBound(Relations)
+						If relationsCount <> 0 OR (NOT IsNull(Relations(0))) Then
+							relationsCount = relationsCount +1
+							ReDim Preserve Relations(relationsCount) As Object
+						End If
+						Relations(relationsCount) = MakeConnectorShape( drawDoc, fromShape, toShape, 2, 0, com.sun.star.drawing.ConnectorType.LINES)
+					End If
+				End If
+			Next j
+		End If
+		'Move the organisationUnitToDraw shape to top center
+		If NOT IsNull(OrgUnits(0)) Then
+			For j = 0 To UBound(OrgUnits)
+				If OrgUnits(j).getString() = organisationUnitToDraw Then
+					OrgUnits(j).SetPosition(MakePoint( (MAX_PAGE_WIDTH-NODE_WIDTH)\2, MAX_PAGE_HEIGHT\5))
+					Exit For
+				End If
+			Next j
+		End If
+		
+		'Now, an iterative procedure of re-organisation of shapes in the drawing space of the page starts,
+		'with the ultimate purpose of beautifying the produced diagam. This will be feasible
+		'if the distances among connected shapes is minimal, without having shapes overlapping each other
+		'FORCE_BASED GRAPH ALGORITHMS: Pseudo-Code		
+		' set up initial node velocities to (0,0)
+		' set up initial node positions randomly // make sure no 2 nodes are in exactly the same position
+		' loop
+		'     total_kinetic_energy := 0 // running sum of total kinetic energy over all particles
+		'     for each node
+		'         net-force := (0, 0) // running sum of total force on this particular node
+		'         
+		'         for each other node
+		'             net-force := net-force + Coulomb_repulsion( this_node, other_node )
+		'         next node
+		'         
+		'         for each spring connected to this node
+		'             net-force := net-force + Hooke_attraction( this_node, spring )
+		'         next spring
+		'         
+		'         // without damping, it moves forever
+		'         this_node.velocity := (this_node.velocity + timestep * net-force) * damping
+		'         this_node.position := this_node.position + timestep * this_node.velocity
+		'         total_kinetic_energy := total_kinetic_energy + this_node.mass * (this_node.velocity)^2
+		'     next node
+		' until total_kinetic_energy is less than some small number  // the simulation has stopped moving
+		
+		'Copy all shapes in one array and initialise
+		Dim shapesArray() As Object
+		Dim forcesArrayX() As Double
+		Dim forcesArrayY() As Double
+		Dim velocitiesArrayX() As Double
+		Dim velocitiesArrayY() As Double
+		Dim shapeMassArray() As Double
+		Dim kineticEnergy() As Double
+		Dim totalKineticEnergy As Double
+		Dim newSize As Integer, oldSize As Integer
+		Dim timeStep As Double
+		Dim orgUnitMass As Double, positionMass As Double, personMass As Double
+		Dim distanceUnit As Double
+		
+		Dim oldTicks As Long, newTicks As Long
+		Dim ticksPerSecond As Double
+		
+		
+		If DrawingBeautification = True Then
+			'Check the timeSteps per sec:
+			oldTicks = GetSystemTicks()
+			Wait(200)
+			newTicks = GetSystemTicks()
+			ticksPerSecond = (newTicks-oldTicks)*5
+			
+			distanceUnit = 1000.0
+			'Balance displacement between OrgUnits
+			orgUnitMass = sqr( DrawingBeautificationCoefficientK*(NODE_WIDTH*1.8/distanceUnit)^3/DrawingBeautificationCoefficientC )
+			'Balance displacement between Positions
+			positionMass = sqr( DrawingBeautificationCoefficientK*(NODE_WIDTH*1.0/distanceUnit)^3/DrawingBeautificationCoefficientC )
+			'Balance displacement between Persons
+			personMass = sqr( DrawingBeautificationCoefficientK*(NODE_WIDTH*1.0/distanceUnit)^3/DrawingBeautificationCoefficientC )
+	
+			newSize = -1
+			If UBound(OrgUnits) >= 0 Then
+				oldSize = newSize
+				newSize = oldSize + UBound(OrgUnits) +1
+				ReDim Preserve shapesArray(newSize) As Object
+				
+				ReDim Preserve shapeArray(newSize) As new GraphShapeType
+				For j=oldSize+1 To newSize
+					shapesArray(j) = OrgUnits(j -oldSize -1)
+					
+					shapeArray(j).positionX = OrgUnits(j -oldSize -1).Position.X
+					shapeArray(j).positionY = OrgUnits(j -oldSize -1).Position.Y
+					shapeArray(j).sizeWidth = OrgUnits(j -oldSize -1).Size.Width
+					shapeArray(j).sizeHeight = OrgUnits(j -oldSize -1).Size.Height
+					shapeArray(j).label = OrgUnits(j -oldSize -1).String
+					shapeArray(j).forceX = 0.0
+					shapeArray(j).forceY = 0.0
+					shapeArray(j).velocityX = 0.0
+					shapeArray(j).velocityY = 0.0
+					shapeArray(j).mass = orgUnitMass
+					shapeArray(j).energy = 0.0
+					shapeArray(j).shapeEntity = "organisation unit"
+				Next j
+			End If
+			If UBound(Positions) >= 0 Then
+				oldSize = newSize
+				newSize = oldSize + UBound(Positions) +1
+				ReDim Preserve shapesArray(newSize) As Object
+				
+				ReDim Preserve shapeArray(newSize) As New GraphShapeType
+				For j=oldSize+1 To newSize
+					shapesArray(j) = Positions(j -oldSize -1)
+
+					shapeArray(j).positionX = Positions(j -oldSize -1).Position.X
+					shapeArray(j).positionY = Positions(j -oldSize -1).Position.Y
+					shapeArray(j).sizeWidth = Positions(j -oldSize -1).Size.Width
+					shapeArray(j).sizeHeight = Positions(j -oldSize -1).Size.Height
+					shapeArray(j).label = Positions(j -oldSize -1).String
+					shapeArray(j).forceX = 0.0
+					shapeArray(j).forceY = 0.0
+					shapeArray(j).velocityX = 0.0
+					shapeArray(j).velocityY = 0.0
+					shapeArray(j).mass = positionMass
+					shapeArray(j).energy = 0.0
+					shapeArray(j).shapeEntity = "position"
+				Next j
+			End If
+			If UBound(Persons) >= 0 AND DRAW_PERSONS = True Then
+				oldSize = newSize
+				newSize = oldSize + UBound(Persons) +1
+				ReDim Preserve shapesArray(newSize) As Object
+				
+				ReDim Preserve shapeArray(newSize) As New GraphShapeType
+				For j=oldSize+1 To newSize
+					shapesArray(j) = Persons(j -oldSize -1)
+
+					shapeArray(j).positionX = Persons(j -oldSize -1).Position.X
+					shapeArray(j).positionY = Persons(j -oldSize -1).Position.Y
+					shapeArray(j).sizeWidth = Persons(j -oldSize -1).Size.Width
+					shapeArray(j).sizeHeight = Persons(j -oldSize -1).Size.Height
+					shapeArray(j).label = Persons(j -oldSize -1).String
+					shapeArray(j).forceX = 0.0
+					shapeArray(j).forceY = 0.0
+					shapeArray(j).velocityX = 0.0
+					shapeArray(j).velocityY = 0.0
+					shapeArray(j).mass = personMass
+					shapeArray(j).energy = 0.0
+					shapeArray(j).shapeEntity = "person"
+				Next j
+			End If
+			'Populate relationArray from Relations array
+			If UBound(Relations) >=0 Then
+				ReDim Preserve relationArray(UBound(Relations)) As New GraphConnectorType
+				For j= 0 To UBound(Relations)
+					relationArray(j).startShape = Relations(j).StartShape.GetString()
+					relationArray(j).endShape = Relations(j).EndShape.GetString()
+					relationArray(j).startGluePoint = Relations(j).StartGluePointIndex
+					relationArray(j).endGluePoint = Relations(j).EndGluePointIndex
+				Next j
+			End If
+			Dim shapeDist As Double
+			Dim forceMultiplierX As Double, forceMultiplierY As Double
+			Dim iterations As Long
+			totalKineticEnergy = DrawingBeautificationEnergyThreshold + 1.0
+			newTicks = GetSystemTicks()
+			'assuming all springs -connectors have the same K spring constant
+			'Hooke's Law: Spring Force = K*x, x is the connector length
+			'Simplified Coulomb's Law: Node Force = C*M1*M2/r^2, M1 is the mass of node1, M2 is the mass of node2, and r is the distance between the 2 nodes
+			iterations = 0
+			Do While totalKineticEnergy > DrawingBeautificationEnergyThreshold
+				totalKineticEnergy = 0.0
+				For aNode = LBound(shapeArray) To UBound(shapeArray)
+					shapeArray(aNode).forceX = 0.0
+					shapeArray(aNode).forceY = 0.0
+					For otherNode = LBound(shapeArray) To UBound(shapeArray)
+						If otherNode <> aNode Then
+							'Check if the node has been moved by hand (by user)
+							'If shapeArray(aNode).positionX <> shapesArray(aNode).Position.X OR shapeArray(aNode).positionY <> shapesArray(aNode).Position.Y Then
+							'	shapeArray(aNode).velocityX = (shapesArray(aNode).Position.X - shapeArray(aNode).positionX)/0.25
+							'	shapeArray(aNode).velocityY = (shapesArray(aNode).Position.Y - shapeArray(aNode).positionY)/0.25
+							'	shapeArray(aNode).positionX = shapesArray(aNode).Position.X
+							'	shapeArray(aNode).positionY = shapesArray(aNode).Position.Y
+							'End If
+							shapeDistX = shapeDistanceX( shapeArray(otherNode).positionX, shapeArray(otherNode).sizeWidth, shapeArray(aNode).positionX, shapeArray(aNode).sizeWidth, NODE_WIDTH*1.5)
+							shapeDistY = shapeDistanceY( shapeArray(otherNode).positionY, shapeArray(otherNode).sizeHeight, shapeArray(aNode).positionY, shapeArray(aNode).sizeHeight, NODE_HEIGHT*1.5)
+							shapeDist = sqr( shapeDistX^2 + shapeDistY^2 )
+							If shapeDistX < 1.75 Then
+								shapeArray(aNode).forceX = shapeArray(aNode).forceX - shapeDistX*DrawingBeautificationCoefficientC /(shapeDist^2)
+							End If
+							If shapeDistY < 1.75 Then
+								shapeArray(aNode).forceY = shapeArray(aNode).forceY - shapeDistY*DrawingBeautificationCoefficientC/(shapeDist^2)							 
+							End If
+							For aConnector = LBound(relationArray) To UBound(relationArray)
+								forceMultiplierX = 1.0
+								forceMultiplierY = 1.0
+								'StartGluePointIndex Index value of 0 : the shape is connected at the top
+								'StartGluePointIndex Index value of 1 : the shape is connected at the left
+								'StartGluePointIndex Index value of 2 : the shape is connected at the bottom
+								'StartGluePointIndex Index value of 3 : the shape is connected at the right
+								thisGlueIndex = relationArray(aConnector).startGluePoint
+								otherGlueIndex = relationArray(aConnector).endGluePoint
+								If ( shapeArray(aNode).label = relationArray(aConnector).startShape AND  shapeArray(otherNode).label = relationArray(aConnector).endShape ) Then
+									shapeDistX = OffsetShapeDistanceX( shapeDistX, shapeArray(otherNode).sizeWidth, shapeArray(aNode).sizeWidth, otherGlueIndex, thisGlueIndex, NODE_WIDTH*1.5 )
+									shapeDistY = OffsetShapeDistanceY( shapeDistY, shapeArray(otherNode).sizeHeight, shapeArray(aNode).sizeHeight, otherGlueIndex, thisGlueIndex, NODE_HEIGHT*1.5 )
+									If shapeArray(otherNode).positionY < (shapeArray(aNode).positionY +1.5*NODE_HEIGHT) AND thisGlueIndex = 2 Then
+										forceMultiplierY = 8.0
+									End If
+									shapeArray(aNode).forceX = shapeArray(aNode).forceX + DrawingBeautificationCoefficientK*forceMultiplierX*shapeDistX*( abs(shapeDist) - 1.5/1.5 )
+									If forceMultiplierY > 1.0 Then
+										shapeArray(aNode).forceY = shapeArray(aNode).forceY + DrawingBeautificationCoefficientK*forceMultiplierY*shapeDistY*abs(shapeDist)									
+									Else
+										shapeArray(aNode).forceY = shapeArray(aNode).forceY + DrawingBeautificationCoefficientK*forceMultiplierY*shapeDistY*( abs(shapeDist) - 1.5/1.5 )
+									End If									
+								ElseIf ( shapeArray(aNode).label = Relations(aConnector).EndShape.GetString() AND  shapeArray(otherNode).label = Relations(aConnector).StartShape.GetString() ) Then
+									shapeDistX = OffsetShapeDistanceX( shapeDistX, shapeArray(aNode).sizeWidth, shapeArray(otherNode).sizeWidth, thisGlueIndex, otherGlueIndex, NODE_WIDTH*1.5 )
+									shapeDistY = OffsetShapeDistanceY( shapeDistY, shapeArray(aNode).sizeHeight, shapeArray(otherNode).sizeHeight, thisGlueIndex, otherGlueIndex, NODE_HEIGHT*1.5 )
+									If shapeArray(otherNode).positionY > (shapeArray(aNode).positionY -1.5*NODE_HEIGHT) AND otherGlueIndex = 0 Then
+										forceMultiplierY = 8.0
+									End If
+									shapeArray(aNode).forceX = shapeArray(aNode).forceX + DrawingBeautificationCoefficientK*forceMultiplierX*shapeDistX*( abs(shapeDist) - 1.5/1.5 )
+									If forceMultiplierY > 1.0 Then
+										shapeArray(aNode).forceY = shapeArray(aNode).forceY + DrawingBeautificationCoefficientK*forceMultiplierY*shapeDistY*abs(shapeDist)									
+									Else
+										shapeArray(aNode).forceY = shapeArray(aNode).forceY + DrawingBeautificationCoefficientK*forceMultiplierY*shapeDistY*( abs(shapeDist) - 1.5/1.5 )
+									End If
+								End If
+							Next aConnector						
+						End If
+					Next otherNode
+
+					oldTicks = newTicks
+					newTicks = GetSystemTicks()
+					timeStep = (newTicks-oldTicks)/ticksPerSecond
+					timeStep = 0.25
+					'If shapesArray(aNode).getString() <> organisationUnitToDraw Then
+					If shapeArray(aNode).label <> organisationUnitToDraw Then					
+						shapeArray(aNode).velocityX = ( shapeArray(aNode).velocityX + timeStep*shapeArray(aNode).forceX )*DrawingBeautificationDumping
+						shapeArray(aNode).velocityY = ( shapeArray(aNode).velocityY + timeStep*shapeArray(aNode).forceY )*DrawingBeautificationDumping						
+						'shapeArray(aNode).positionX = constraintXInPage( shapeArray(aNode).positionX + (NODE_WIDTH/2*timeStep*shapeArray(aNode).velocityX)\1 )
+						'shapeArray(aNode).positionY = constraintYInPage( shapeArray(aNode).positionY + (NODE_HEIGHT/2*timeStep*shapeArray(aNode).velocityY)\1 )
+						shapeArray(aNode).positionX = constraintXInPage( shapeArray(aNode).positionX + (NODE_WIDTH/8*timeStep*shapeArray(aNode).forceX)\1 )
+						shapeArray(aNode).positionY = constraintYInPage( shapeArray(aNode).positionY + (NODE_HEIGHT/8*timeStep*shapeArray(aNode).forceY)\1 )						
+						If NOT IsNull(DrawDoc) AND iterations MOD 20 = 0 Then
+							shapesArray(aNode).setPosition(MakePoint(shapeArray(aNode).positionX, shapeArray(aNode).positionY))
+						End If
+						shapeArray(aNode).energy =  sqr( shapeArray(aNode).velocityX^2 + shapeArray(aNode).velocityY^2 )
+						totalKineticEnergy = totalKineticEnergy + shapeArray(aNode).energy
+					End If
+				Next aNode
+				iterations = iterations + 1
+			Loop
+			Print "Τερματισμός ωραιοποίησης με συνολική ενέργεια τερματισμού=" & totalKineticEnergy
+			For aNode = LBound(shapeArray) To UBound(shapeArray)
+				shapesArray(aNode).Position.X = shapeArray(aNode).positionX
+				shapesArray(aNode).Position.Y = shapeArray(aNode).positionY
+			Next aNode 
+			'Termination and deletion of array elements
+			ReDim shapeArray(0) As New GraphShapeType
+			ReDim relationArray(0) As New GraphConnectorType
+			ReDim shapesArray(0) As Object
+			ReDim Relations(0) As Object
+		End If
+	Else
+		MsgBox "Δε βρέθηκε συσχετισμένη Οργανική μονάδα για σχεδίαση", 16, "Σφάλμα κατά τη γραφική απεικόνιση"
+	End If
+	
+	ErrorHandler: 
+	If Err Then
+		MsgBox "Η απεικόνιση του οργανογράμματος δεν είναι πια διαθέσιμη", 16, "Σφάλμα κατά τη γραφική απεικόνιση"
+	End If
+End Sub
+
+
+Function OffsetShapeDistanceX(dist As Double, aWidth As Long, bWidth As Long, gIndex1, gIndex2, dUnit As Double) As Double
+	'gIndex value of 0 : the shape is connected at the top
+	'gIndex value of 1 : the shape is connected at the left
+	'gIndex value of 2 : the shape is connected at the bottom
+	'gIndex value of 3 : the shape is connected at the right
+	Dim retVal As Double
+	retVal = dist*dUnit
+	Select Case gIndex1
+		Case 1
+			retVal = retVal - aWidth/2
+		Case 3
+			retVal = retVal + aWidth/2
+	End Select
+	Select Case gIndex2
+		Case 1
+			retVal = retVal + bWidth/2
+		Case 3
+			retVal = retVal - bWidth/2
+	End Select
+	OffsetShapeDistanceX = retVal/dUnit
+End Function
+
+
+Function OffsetShapeDistanceY(dist As Double, aHeight As Long, bHeight As Long, gIndex1, gIndex2, dUnit As Double) As Double
+	'gIndex value of 0 : the shape is connected at the top
+	'gIndex value of 1 : the shape is connected at the left
+	'gIndex value of 2 : the shape is connected at the bottom
+	'gIndex value of 3 : the shape is connected at the right
+	Dim retVal As Double
+	retVal = dist*dUnit
+	Select Case gIndex1
+		Case 0
+			retVal = retVal - aHeight/2
+		Case 2
+			retVal = retVal + aHeight/2
+	End Select
+	Select Case gIndex2
+		Case 0
+			retVal = retVal + bHeight/2
+		Case 2
+			retVal = retVal - bHeight/2
+	End Select
+	OffsetShapeDistanceY = retVal/dUnit
+End Function
+
+
+'calcs the euclidean distance between the centres of the two shapes given as X and Y coordinates, if no gIndex arguments are provided
+'gIndex1 and gIndex2 offset the distance start and end points to the actual glueing points of the shape
+Function shapeDistance(aX As Long, aY As Long, aSizeWidth As Long, aSizeHeight As Long, bX As Long, bY As Long, bSizeWidth As Long, bSizeHeight As Long, dUnit As Double, optional gIndex1, optional gIndex2) As Double
+	Dim xComponent As Double, yComponent As Double
+	xComponent = shapeDistanceXFromCoords(aX, aSizeWidth, bX, bSizeWidth, dUnit, gIndex1, gIndex2)
+	yComponent = shapeDistanceYFromCoords(aY, aSizeHeight, bY, bSizeHeight, dUnit, gIndex1, gIndex2)
+
+	If xComponent^2 + yComponent^2 > 0 Then
+		shapeDistanceFromCoords = sqr(xComponent^2 + yComponent^2)
+	Else
+		shapeDistanceFromCoords = 0.000001
+	End If
+End Function
+
+
+Function shapeDistanceX(aX As Long, aSizeWidth As Long, bX As Long, bSizeWidth As Long, dUnit As Double,  optional gIndex1, optional gIndex2) As Double
+	Dim xComponent As Double
+	xComponent = aX +(aSizeWidth/2) - ( bX +(bSizeWidth/2) )
+	If Not IsMissing(gIndex1) Then
+		Select Case gIndex1
+			Case 1
+				xComponent = xComponent - aSizeWidth/2
+			Case 3
+				xComponent = xComponent + aSizeWidth/2
+		End Select
+	End If
+	If Not IsMissing(gIndex2) Then
+		Select Case gIndex2
+			Case 1
+				xComponent = xComponent + bSizeWidth/2
+			Case 3
+				xComponent = xComponent - bSizeWidth/2
+		End Select
+	End If
+	If xComponent = 0 Then
+		xComponent = 0.0001 'avoid returning 0, avoid dividing by 0
+	End If
+	shapeDistanceX = xComponent/ dUnit
+End Function
+
+
+Function shapeDistanceY(aY As Long, aSizeHeight As Long, bY As Long, bSizeHeight As Long, dUnit As Double,  optional gIndex1, optional gIndex2) As Double
+	Dim yComponent As Double
+	yComponent = aY +(aSizeHeight/2) - ( bY +(bSizeHeight/2) )
+	If Not IsMissing(gIndex1) Then
+		Select Case gIndex1
+			Case 0
+				yComponent = yComponent - aSizeHeight/2
+			Case 2
+				yComponent = yComponent + aSizeHeight/2
+		End Select
+	End If
+	If Not IsMissing(gIndex2) Then
+		Select Case gIndex2
+			Case 0
+				yComponent = yComponent + bSizeHeight/2
+			Case 2
+				yComponent = yComponent - bSizeHeight/2
+		End Select
+	End If
+	If yComponent = 0 Then
+		yComponent = 0.0001 'avoid returning 0, avoid dividing by 0
+	End If
+	shapeDistanceY = yComponent/ dUnit
+End Function
+
+Function constraintXInPage(positionX As Long) As Long
+	Dim returnX As Long
+	
+	If positionX < MAX_PAGE_BORDER_LEFT Then
+		returnX = MAX_PAGE_BORDER_LEFT
+	ElseIf positionX > MAX_PAGE_WIDTH - MAX_PAGE_BORDER_RIGHT - NODE_WIDTH Then
+		returnX = MAX_PAGE_WIDTH - MAX_PAGE_BORDER_RIGHT - NODE_WIDTH
+	Else
+		returnX = positionX
+	End If
+	constraintXInPage = returnX
+End Function
+
+Function constraintYInPage(positionY As Long) As Long
+	Dim returnY As Long
+	
+	If positionY < MAX_PAGE_BORDER_TOP Then
+		returnY = MAX_PAGE_BORDER_TOP
+	ElseIf positionY > MAX_PAGE_HEIGHT - MAX_PAGE_BORDER_BOTTOM - NODE_HEIGHT Then
+		returnY = MAX_PAGE_HEIGHT - MAX_PAGE_BORDER_BOTTOM - NODE_HEIGHT
+	Else
+		returnY = positionY
+	End If
+	constraintYInPage = returnY
+End Function
+
+
+Public Function RemoveIdFromString(Source As String) As String
+	Dim Result As String
+	CurrentPos = InStr(1, Source, ":")
+	a = Len(Source)
+	If CurrentPos <> 0 Then
+		'For getting the last part of the string:
+        'Result = Mid(Source, CurrentPos + 1, Len(Source) - CurrentPos + 1)
+        'For getting the ID -first- part of the string:
+        Result = Mid(Source, 1, CurrentPos - 1)
+    Else
+        Result = Source
+    End If
+	RemoveIdFromString = Result
+End Function
+
+
+Function WrapString( aString As String ) As String
+	WrapString = ReplaceString( aString, Chr(32), Chr(13) ) 'We may use "."+Chr(13) instead
+End Function
+
+Function UnwrapString( aString As String ) As String
+	UnwrapString = ReplaceString( aString, Chr(13), Chr(32) ) 'We may use "."+Chr(13) instead
+End Function
+
+Function ReplaceString(Source As String, Search As String, NewPart As String)
+  Dim Result As String
+  Dim StartPos As Long
+  Dim CurrentPos As Long
+ 
+  Result = ""
+  StartPos = 1
+  CurrentPos = 1
+ 
+  If Search = "" Then
+    Result = Source
+  Else 
+    Do While CurrentPos <> 0
+      CurrentPos = InStr(StartPos, Source, Search)
+      If CurrentPos <> 0 Then
+        Result = Result + Mid(Source, StartPos, _
+        CurrentPos - StartPos)
+        Result = Result + NewPart
+        StartPos = CurrentPos + Len(Search)
+      Else
+        Result = Result + Mid(Source, StartPos, Len(Source))
+      End If                ' Position <> 0
+    Loop 
+  End If 
+ 
+  ReplaceString = Result
+End Function
+
+
+Function MakePoint( x As Long, y As Long ) As com.sun.star.awt.Point
+   Dim aPoint As New com.sun.star.awt.Point
+   aPoint.x = x
+   aPoint.y = y
+   MakePoint() = aPoint
+End Function
+
+Function MakeSize( width As Long, height As Long ) As com.sun.star.awt.Size
+   Dim aSize As New com.sun.star.awt.Size
+   aSize.width = width
+   aSize.height = height
+   MakeSize() = aSize
+End Function
+
+Function MakeConnectorShape( oDrawDoc As Object, startShape As Object, endShape As Object,_
+ Optional startGluePoint As Integer, Optional endGluePoint As Integer, Optional connectionType As Long ) As com.sun.star.drawing.ConnectorShape
+	oLine = oDrawDoc.createInstance( "com.sun.star.drawing.ConnectorShape" )
+	oDrawPage = oDrawDoc.getDrawPages().getByIndex( 0 )
+	oDrawPage.add( oLine )
+	oLine.StartShape = startShape
+	If Not IsMissing( lineType ) Then
+		oLine.StartGluePointIndex = startGluePoint
+	Else
+		oLine.StartGluePointIndex = 2
+	End If
+	oLine.EndShape = endShape
+	If Not IsMissing( lineType ) Then
+		oLine.EndGluePointIndex = endGluePoint
+	Else
+		oLine.EndGluePointIndex = 4
+	End If
+		'EdgeKind can be: com.sun.star.drawing.ConnectorType.CURVE or com.sun.star.drawing.ConnectorType.STANDARD or com.sun.star.drawing.ConnectorType.LINES
+	oLine.EdgeKind = connectionType 'com.sun.star.drawing.ConnectorType.STANDARD
+ 	MakeConnectorShape() = oLine
+End Function 
+
+Function MakeLineShape( oDrawDoc As Object, Optional position As com.sun.star.awt.Point, Optional size As com.sun.star.awt.Size ) As com.sun.star.drawing.LineShape
+   oShape = oDrawDoc.createInstance( "com.sun.star.drawing.LineShape" )
+   If Not IsMissing( position ) Then
+      oShape.Position = position
+   EndIf
+   If Not IsMissing( size ) Then
+      oShape.Size = size
+   EndIf
+   MakeLineShape() = oShape
+End Function 
+
+Function MakeRectangleShape( oDrawDoc As Object, Optional position  As com.sun.star.awt.Point, Optional size As com.sun.star.awt.Size ) As com.sun.star.drawing.RectangleShape
+	RectangleShape = oDrawDoc.createInstance("com.sun.star.drawing.RectangleShape")
+	If Not IsMissing( position ) Then
+		RectangleShape.Position = Position
+ 	End If
+	If Not IsMissing( size ) Then
+		RectangleShape.Size = Size
+	End If
+	MakeRectangleShape() = RectangleShape
+End Function
+
+
+

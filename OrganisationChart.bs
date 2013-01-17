@@ -1,0 +1,1359 @@
+REM  *****  BASIC  *****
+REM Developer of this Basic module: Elias Kalapanidas
+REM and sole responsible for the mess in the code
+
+
+'Basic GUIDE for Basic and stuff...
+'http://wiki.services.openoffice.org/wiki/Documentation/BASIC_Guide
+
+'This is a constant for how many rows the headers occupy in the entities Calc Sheets
+global Const HEADER_ROWS_PER_SHEET As Integer = 1
+'And these are the constants for the names of the 4 organisation chart Sheets 
+'that we are going to use in order to store organisation-related data for our chart
+global Const ORGUNITS_SHEETNAME As String = "ΟργανικέςΜονάδες"
+global Const POSITIONS_SHEETNAME As String = "Θέσεις"
+global Const PERSONS_SHEETNAME As String = "Πρόσωπα"
+global Const ORGDOCUMENT_SHEETNAME As String = "Έγγραφο"
+global Const RESPONSIBILITIES_SHEETNAME As String = "Αρμοδιότητες"
+global OrgUnitDataRows()
+
+'--------------------------------------------------------------------------------------
+'Here the Sheet-dependent subs and functions start:
+Sub InitializeOnLoadDocument
+	Call AboutOrganisationChart
+	Call RegisterKeyHandler
+	Call RegisterModifyListener
+End Sub
+
+Sub DisposeOnUnloadDocument
+	Call UnregisterKeyHandler
+	Call UnregisterModifyListener
+End Sub
+
+
+Sub AboutOrganisationChart
+	'Reference for MsgBox function:
+	'http://www.suite101.com/content/automating-openoffice-building-dialogs-a58971
+	MsgBox "Εφαρμογή Οργανογράμματος, 2010-2011, Έκδοση 0.87" & Chr(13) & "Το Οργανόγραμμα είναι μία εφαρμογή διαχείρισης και σχεδιασμού οργανογραμμάτων Οργανισμών για το OpenOffice Calc." & Chr(13) & _
+	"Αναπτύχθηκε από τον Ηλία Καλαπανίδα και τον Βασίλη Κλουβάτο για λογαριασμό της ΕΛΛΑΚ (www.ellak.gr)", 64, "Σχετικά με το Οργανόγραμμα"
+End Sub
+
+Sub OpenHELPURL
+	Shell( "cmd.exe /cStart http://projects.ellak.gr/projects/orgchart/wiki/ORG_use_instructions" )
+End Sub
+
+Sub InsertNewRecord
+	Dim Sheet As Object
+	Dim sheetName As String
+	
+	Sheet = ThisComponent.GetCurrentController.ActiveSheet
+	sheetName = Sheet.Name
+	If sheetName = POSITIONS_SHEETNAME OR sheetName = PERSONS_SHEETNAME OR sheetName = ORGUNITS_SHEETNAME Then
+		'Sheet.Unprotect("")
+		InsertNewRecordMethod(Sheet.Name)
+		'Sheet.Protect("")
+	End If
+End Sub
+
+Sub RemoveRecord
+	Dim Sheet As Object
+	Dim sheetName As String
+	
+	Sheet = ThisComponent.GetCurrentController.ActiveSheet
+	sheetName = Sheet.Name
+	If sheetName = POSITIONS_SHEETNAME OR sheetName = PERSONS_SHEETNAME OR sheetName = ORGUNITS_SHEETNAME Then
+		'Sheet.Unprotect("")
+		RemoveRecordMethod(Sheet.Name)
+		'Sheet.Protect("")
+	End If
+End Sub
+
+'Flush sheets from data (Εκκένωση δεδομένων)
+Sub ResetOrganisationChartData
+	Dim CalcDoc As Object
+	Dim DocumentSheet As Object
+	Dim OrgUnitsSheet As Object
+	Dim PositionsSheet As Object
+	Dim PersonsSheet As Object
+	
+	CalcDoc = ThisComponent
+	'To find related Persons, OrgUnits or Positions from Positions, use function MATCH
+
+	If CalcDoc.Sheets.hasByName(ORGUNITS_SHEETNAME) AND CalcDoc.Sheets.hasByName(POSITIONS_SHEETNAME) AND CalcDoc.Sheets.hasByName(PERSONS_SHEETNAME) AND CalcDoc.Sheets.hasByName(ORGDOCUMENT_SHEETNAME) Then
+		If MsgBox("Η λειτουργία αυτή πρόκειται να ΔΙΑΓΡΑΨΕΙ ΟΛΑ τα ΔΕΔΟΜΕΝΑ σας σε όλα τα φύλλα εργασίας του Οργανογράμματος. Θέλετε σίγουρα να συνεχίσετε;", MB_OKCANCEL + MB_ICONQUESTION, "Επιβεβαίωση εισαγωγής στοιχείων") <> IDOK Then
+			Exit Sub
+		End If 
+		DocumentSheet = CalcDoc.Sheets.getByName(ORGDOCUMENT_SHEETNAME)
+		DocumentArray = DocumentSheet.GetCellRangeByPosition(2, 1, 2, 6).getDataArray()
+		For i = 0 To 5
+				DocumentArray(i)(0) = ""
+		Next i
+		DocumentSheet.GetCellRangeByPosition(2, 1, 2, 6).SetDataArray(DocumentArray)
+		
+		Call UnregisterModifyListener
+		
+		Call ResetColumnsValidation
+		OrgUnitsSheet = CalcDoc.Sheets.getByName(ORGUNITS_SHEETNAME)
+		MaxRows = GetLastUsedRow(OrgUnitsSheet)
+		MaxCols = GetLastUsedColumn(OrgUnitsSheet)
+		If MaxRows >= HEADER_ROWS_PER_SHEET Then
+			OrgUnitsRange = OrgUnitsSheet.GetCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, MaxCols, MaxRows)
+			clearRange(1, OrgUnitsRange)
+		End If
+
+		PositionsSheet = CalcDoc.Sheets.getByName(POSITIONS_SHEETNAME)
+		MaxRows = GetLastUsedRow(PositionsSheet)
+		MaxCols = GetLastUsedColumn(PositionsSheet)
+		If MaxRows >= HEADER_ROWS_PER_SHEET Then
+			PositionsRange = PositionsSheet.GetCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, MaxCols, MaxRows)
+			clearRange(1, PositionsRange)
+		End If
+
+		PersonsSheet = CalcDoc.Sheets.getByName(PERSONS_SHEETNAME)
+		MaxRows = GetLastUsedRow(PersonsSheet)
+		MaxCols = GetLastUsedColumn(PersonsSheet)
+		If MaxRows >= HEADER_ROWS_PER_SHEET Then
+			PersonsRange = PersonsSheet.GetCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, MaxCols, MaxRows)
+			clearRange(1, PersonsRange)
+		End If
+		
+		Call RegisterModifyListener
+	End If
+End Sub
+
+
+public sub clearRange(nAttr as integer, oRange as object) 
+   select case nAttr 
+      case 11: 
+         iCellAttr = _ 
+            com.sun.star.sheet.CellFlags.STRING 
+      case 1: 
+         iCellAttr = com.sun.star.sheet.CellFlags.VALUE + _
+            com.sun.star.sheet.CellFlags.DATETIME + com.sun.star.sheet.CellFlags.STRING + com.sun.star.sheet.CellFlags.FORMULA + com.sun.star.sheet.CellFlags.EDITATTR
+                
+      case 2: 
+         iCellAttr = com.sun.star.sheet.CellFlags.VALUE + _
+            com.sun.star.sheet.CellFlags.DATETIME + com.sun.star.sheet.CellFlags.STRING + com.sun.star.sheet.CellFlags.ANNOTATION + com.sun.star.sheet.CellFlags.FORMULA + _
+            com.sun.star.sheet.CellFlags.HARDATTR + com.sun.star.sheet.CellFlags.STYLES + com.sun.star.sheet.CellFlags.OBJECTS + com.sun.star.sheet.CellFlags.EDITATTR 
+   end select 
+    
+   oRange.ClearContents(iCellAttr) 
+end sub
+
+
+Function ValidateOrganisationChartData As Integer
+	' Return 0 for all clear
+	Dim retval As Integer
+	Dim PersonsSheet, PositionsSheet, OrgUnitsSheet As Object
+	
+	retval = 0
+	ValidateOrganisationChartData = retval
+	'Rule 1: Sheet ΟργανικέςΜονάδες should exist
+	'Rule 2: Sheet Θέσεις should exist
+	'Rule 3: Sheet Πρόσωπα should exist
+	'Rule 4: 1st ΟργανικέςΜονάδες row (under headers) should be filled in with Organisation's name (Sheet ΟργανικέςΜονάδες, 2nd row)
+	'Rule 5: Sheet ΟργανικέςΜονάδες should have 1st and 2nd columns filled in, up to last row (?)
+	'Rule 6: Sheet Θέσεις should have 1st and 2nd columns filled in, up to last row
+	'Rule 7: All IDs (A/A columns) in ΟργανικέςΜονάδες sheet should be unique, no duplicates allowed
+	'Rule 8: All IDs (A/A columns) in Θέσεις sheet should be unique, no duplicates allowed
+	'Rule 9: All IDs (A/A columns) in Πρόσωπα sheet should be unique, no duplicates allowed
+	'Rule 10: No record in ΟργανικέςΜονάδες should belong to itself
+	'Rule 11: No record in Θέσεις should refer to itself
+	'When one of the abovementioned rules is violated, this function returns en Error code equal to the rule number
+	Doc = ThisComponent
+	
+	PersonsSheet = Doc.Sheets.getByName(PERSONS_SHEETNAME)
+	PositionsSheet = Doc.Sheets.getByName(POSITIONS_SHEETNAME)
+	OrgUnitsSheet = Doc.Sheets.getByName(ORGUNITS_SHEETNAME)
+	If retval = 0 AND IsNull(OrgUnitsSheet) Then	'Rule 1
+		retval = 1
+		MsgBox "Το φύλλο εργασίας " & ORGUNITS_SHEETNAME & " δε βρέθηκε", 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+	End If
+	If retval = 0 AND IsNull(PositionsSheet) Then	'Rule 2
+		retval = 2
+		MsgBox "Το φύλλο εργασίας "& POSITIONS_SHEETNAME & " δε βρέθηκε", 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+	End If
+	If retval = 0 AND IsNull(PersonsSheet) Then		'Rule 3
+		retval = 3
+		MsgBox "Το φύλλο εργασίας " & PERSONS_SHEETNAME & " δε βρέθηκε", 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+	End If
+	If retval = 0 AND OrgUnitsSheet.GetCellByPosition(1, 1).Type = com.sun.star.table.CellContentType.EMPTY Then	'Rule 4
+		retval = 4
+		MsgBox "Το κελί Β2 στο φύλλο εργασίας " & ORGUNITS_SHEETNAME & " πρέπει να περιέχει το όνομα του βασικού Οργανισμού και δεν μπορεί να είναι κενό", 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+	End If
+	Persons = GetLastUsedRow(PersonsSheet)
+	Positions = GetLastUsedRow(PositionsSheet)
+	OrgUnits = GetLastUsedRow(OrgUnitsSheet)
+	If  OrgUnits > HEADER_ROWS_PER_SHEET Then
+		If retval = 0 AND FindDuplicates( OrgUnitsSheet.GetCellRangeByPosition(0,HEADER_ROWS_PER_SHEET,0,OrgUnits) ) >0 Then
+			retval = 7
+		End If
+	Else
+		MsgBox "Το φύλλο εργασίας " & ORGUNITS_SHEETNAME & " πρέπει να περιέχει τουλάχιστο μία οργανική μονάδα, αυτή του ίδιου του οργανισμού", 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+		retval = 5
+	End If
+	If Positions > HEADER_ROWS_PER_SHEET Then
+		If retval = 0 AND FindDuplicates( PositionsSheet.GetCellRangeByPosition(0,HEADER_ROWS_PER_SHEET,0,Positions) ) >0 Then
+			retval = 8
+		End If
+	End If
+	If Persons > HEADER_ROWS_PER_SHEET Then
+		If retval = 0 AND Persons > HEADER_ROWS_PER_SHEET AND FindDuplicates( PersonsSheet.GetCellRangeByPosition(0,HEADER_ROWS_PER_SHEET,0,Persons) ) >0 Then
+			retval = 9
+		End If
+	End If
+	If OrgUnits > HEADER_ROWS_PER_SHEET Then
+		autoReference = FindAutoReference( OrgUnitsSheet.GetCellRangeByPosition(0,HEADER_ROWS_PER_SHEET,2,OrgUnits), 2 )
+		If retval = 0 AND autoReference > -1 Then
+			retval = 10
+			MsgBox "Βρέθηκε αυτοαναφορά στο φύλλο ΟργανικέςΜονάδες στη γραμμή " & autoReference+HEADER_ROWS_PER_SHEET+1 & ". Παρακαλώ επιλέξτε άλλη τιμή για τη σχέση Ανήκει σε Οργ.Μονάδα" , 16, "Σφάλμα ακεραιότητας οργανογράμματος"
+		End If
+	End If
+	If Positions > HEADER_ROWS_PER_SHEET Then
+		autoReference = FindAutoReference( PositionsSheet.GetCellRangeByPosition(0,HEADER_ROWS_PER_SHEET,4,Positions), 4 )
+		If retval = 0 AND autoReference > -1 Then
+			retval = 11
+			MsgBox "Βρέθηκε αυτοαναφορά στο φύλλο Θέσεις στη γραμμή " & autoReference+HEADER_ROWS_PER_SHEET+1 & ". Παρακαλώ επιλέξτε άλλη τιμή για τη σχέση Αναφέρεται σε Θέση" , 16, "Σφάλμα ακεραιότητας οργανογράμματος"			
+		End If
+	End If
+		
+	ValidateOrganisationChartData = retval
+End Function
+
+'--------------------------------------------------------------------------------------
+'Here starts the generic parameterisable functions
+
+'Subs to install a proper keylistener in order to launch the CallMultiValueContainerDialog dialog
+Global oKeyHandler As Object
+
+Sub RegisterKeyHandler
+	oDocView = ThisComponent.getCurrentController
+	If IsNull(oKeyHandler) Then
+	    oKeyHandler = createUnoListener("OrganisationChart_", "com.sun.star.awt.XKeyHandler")
+	'   writedbginfo oKeyHandler
+    	oDocView.addKeyHandler(oKeyHandler)
+    End If
+End Sub
+
+'Subs to install a proper keylistener in order to launch the CallMultiValueContainerDialog dialog
+Sub UnregisterKeyHandler
+	If NOT IsNull(oKeyHandler) Then
+		oDocView = ThisComponent.getCurrentController
+		oDocView.removeKeyHandler(oKeyHandler)
+		oKeyHandler = nothing
+	End If
+End Sub
+
+'Subs to install a proper keylistener in order to launch the CallMultiValueContainerDialog dialog
+Function OrganisationChart_KeyPressed(oEvt) As Boolean
+	If oEvt.modifiers = com.sun.star.awt.KeyModifier.MOD1 AND oEvt.KeyCode = com.sun.star.awt.Key.RETURN Then
+		Call CallMultiValueContainerDialog
+		'Call UnregisterKeyListener
+		'Print "Pressed Ctrl-Return!"
+	Else
+		OrganisationChart_KeyPressed = False
+	End If
+	'OrganisationChart_KeyPressed = True
+End Function
+
+'Subs to install a proper keylistener in order to launch the CallMultiValueContainerDialog dialog
+Function OrganisationChart_KeyReleased(oEvt) As Boolean
+	OrganisationChart_KeyReleased = False
+End Function
+
+'Subs to install a proper keylistener in order to launch the CallMultiValueContainerDialog dialog
+Sub OrganisationChart_Disposing(oEvt)
+End Sub
+
+
+'Subs to install a proper keylistener in order to launch the CallMultiValueContainerDialog dialog
+Global oModifyListener As Object
+
+Sub RegisterModifyListener
+	PersonsSheet = ThisComponent.Sheets.getByName(PERSONS_SHEETNAME)
+	PositionsSheet = ThisComponent.Sheets.getByName(POSITIONS_SHEETNAME)
+	OrgUnitsSheet = ThisComponent.Sheets.getByName(ORGUNITS_SHEETNAME)
+'	oDocView = ThisComponent.getCurrentController
+	If IsNull(oModifyListener) Then
+	    oModifyListener = createUnoListener("SheetListener_", "com.sun.star.util.XModifyListener")
+	'   writedbginfo oKeyHandler
+    	PersonsSheet.addModifyListener(oModifyListener)
+    	PositionsSheet.addModifyListener(oModifyListener)
+    	OrgUnitsSheet.addModifyListener(oModifyListener)
+	End If
+End Sub
+
+Sub UnregisterModifyListener
+	PersonsSheet = ThisComponent.Sheets.getByName(PERSONS_SHEETNAME)
+	PositionsSheet = ThisComponent.Sheets.getByName(POSITIONS_SHEETNAME)
+	OrgUnitsSheet = ThisComponent.Sheets.getByName(ORGUNITS_SHEETNAME)
+	If NOT IsNull(oModifyListener) Then
+		PersonsSheet.removeModifyListener(oModifyListener)
+		PositionsSheet.removeModifyListener(oModifyListener)
+		OrgUnitsSheet.removeModifyListener(oModifyListener)
+	End If
+End Sub
+
+Sub SheetListener_Disposing(oEvent)
+End Sub
+
+Sub SheetListener__queryInterface( oEvent )
+End Sub
+
+Sub SheetListener_Modified(oEvent)
+	Dim last_record_row As Long
+	Dim Sheet As Object, idRange As Object
+	Dim newRecordIDName As String, oldRecordIDName As String
+	
+	Sheet = ThisComponent.GetCurrentController.ActiveSheet
+	Selection = ThisComponent.CurrentSelection
+	SelectedRowStart = Selection.getRangeAddress.StartRow 
+	SelectedColStart = Selection.getRangeAddress.StartColumn 
+	last_record_row = GetLastUsedRow(Sheet)
+	last_record_col = getLastUsedColumn(Sheet)
+	OrgUnitDataRows() = Sheet.getCellRangeByPosition( 0, HEADER_ROWS_PER_SHEET, last_record_col, last_record_row ).getDataArray()
+	'msgbox "Modified - New Value "+str(Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Value)  
+	'Business logic: What events to catch and how to handle them
+	'If modified cell is in protected headers, restore the original titles in the cell value
+	If SelectedRowStart < HEADER_ROWS_PER_SHEET Then
+		Select Case SelectedColStart
+			Case 0
+				Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula = "Α/Α"
+			Case 1
+				If Sheet.Name = ORGUNITS_SHEETNAME Then
+					Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula = "Όνομα"
+				Elseif Sheet.Name = PERSONS_SHEETNAME Then
+					Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula = "Όνομα"
+				Elseif Sheet.Name = POSITIONS_SHEETNAME Then
+					Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula = "Τίτλος θέσης"
+				End If
+			Case 2
+				If Sheet.Name = ORGUNITS_SHEETNAME Then
+					Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula = "Ανήκει σε Οργ.Μονάδα"
+				Elseif Sheet.Name = PERSONS_SHEETNAME Then
+					Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula = "Επώνυμο"
+				Elseif Sheet.Name = POSITIONS_SHEETNAME Then
+					Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula = "Ανήκει σε Οργ.Μονάδα"
+				End If
+			Case 3
+				If Sheet.Name = POSITIONS_SHEETNAME Then
+					Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula = "Πληρείται από Πρόσωπο"
+				End If
+			Case 4
+				If Sheet.Name = POSITIONS_SHEETNAME Then
+					Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula = "Αναφέρεται σε Θέση"
+				End If
+			End Select
+	Else
+		'If modified cell is record name (second column or third in Positions sheet), update all references in relation columns
+		changedName = Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).String
+		If ((Sheet.Name = ORGUNITS_SHEETNAME OR Sheet.Name = POSITIONS_SHEETNAME) AND SelectedColStart <= 1) OR (Sheet.Name = PERSONS_SHEETNAME AND SelectedColStart <= 2) Then
+			'Define ranges of related columns in this and other sheets , search for the old ID and replace with new value
+			'Now, we have a partially changed stringID for the record that has been changed
+			'We need to search for the unchanged part (whether name or ID) and track the old value of the changed bit
+			'Then reconstruct the changed record full ID (oldRecordIDName) and replace all such references with the new one (newRecordIDName)
+			PositionsSheet = ThisComponent.Sheets.getByName(POSITIONS_SHEETNAME)
+			PositionsCount = getLastUsedRow(PositionsSheet)
+			OrgUnitsSheet = ThisComponent.Sheets.getByName(ORGUNITS_SHEETNAME)
+			OrgUnitsCount = getLastUsedRow(OrgUnitsSheet)
+			If SelectedColStart = 0 Then 'it's the ID that has changed, search for the name
+				If Sheet.Name = POSITIONS_SHEETNAME AND Sheet.getCellByPosition(1, SelectedRowStart).String <>"" Then		
+					newRecordIDName = changedName & ":" & Sheet.getCellByPosition(1, SelectedRowStart).String
+					foundCell = SimpleSheetSearch(Sheet.getCellByPosition(1, SelectedRowStart).String, PositionsSheet, False)
+					If NOT IsNull(foundCell) Then
+						oldRecordIDName = FindFirstIn(foundCell.GetString(), ":") & ":" & Sheet.getCellByPosition(1, SelectedRowStart)
+						If oldRecordIDName <> newRecordIDName Then
+							SimpleSheetReplace( oldRecordIDName, newRecordIDName, PositionsSheet, False )
+						End If
+					End If
+				ElseIf Sheet.Name = PERSONS_SHEETNAME AND Sheet.getCellByPosition(2, SelectedRowStart).GetString() <>"" Then
+					newRecordIDName = changedName & ":" & Sheet.getCellByPosition(1, SelectedRowStart).GetString() & " " & Sheet.getCellByPosition(2, SelectedRowStart).GetString()
+					foundCell = SimpleSheetSearch(Sheet.getCellByPosition(1, SelectedRowStart).GetString() & " " & Sheet.getCellByPosition(2, SelectedRowStart).GetString(), PositionsSheet, False)
+					If NOT IsNull(foundCell) Then
+						oldRecordIDName = FindFirstIn(foundCell.GetString(), ":") & ":" & Sheet.getCellByPosition(1, SelectedRowStart).GetString() & " " & Sheet.getCellByPosition(2, SelectedRowStart).GetString()
+						If oldRecordIDName <> newRecordIDName Then
+							SimpleSheetReplace( oldRecordIDName, newRecordIDName, PositionsSheet, False )
+						End If
+					End If
+				ElseIf Sheet.Name = ORGUNITS_SHEETNAME AND Sheet.getCellByPosition(1, SelectedRowStart).GetString() <>"" Then
+					newRecordIDName = changedName & ":" & Sheet.getCellByPosition(1, SelectedRowStart).GetString()
+					foundCell = SimpleSheetSearch(Sheet.getCellByPosition(1, SelectedRowStart).GetString(), PositionsSheet, False)
+					If NOT IsNull(foundCell) Then
+						oldRecordIDName = FindFirstIn(foundCell.GetString(), ":") & ":" & Sheet.getCellByPosition(1, SelectedRowStart).GetString()
+						If oldRecordIDName <> newRecordIDName Then
+							SimpleSheetReplace( oldRecordIDName, newRecordIDName, Sheet, False )
+							SimpleSheetReplace( oldRecordIDName, newRecordIDName, PositionsSheet, False )
+						End If
+					Else
+						foundCell = SimpleSheetSearch(PositionsSheet.getCellByPosition(1, SelectedRowStart).GetString(), Sheet, False)
+						If foundCell.String = Sheet.getCellByPosition(1, SelectedRowStart).GetString() Then
+							foundCell = SimpleSheetSearch(PositionsSheet.getCellByPosition(1, SelectedRowStart).GetString(), Sheet, False, True)
+						End If
+						If NOT IsNull(foundCell) Then
+							oldRecordIDName = FindFirstIn(foundCell.GetString(), ":") & ":" & Sheet.getCellByPosition(1, SelectedRowStart).GetString()
+							If oldRecordIDName <> newRecordIDName Then
+								SimpleSheetReplace( oldRecordIDName, newRecordIDName, Sheet, False )
+								SimpleSheetReplace( oldRecordIDName, newRecordIDName, PositionsSheet, False )
+							End If
+						End If						
+					End If
+				End If
+			ElseIf SelectedColStart > 0 Then '1 or 2, it is the name or last name that changed, search for the ID
+				If Sheet.Name = PERSONS_SHEETNAME AND Sheet.getCellByPosition(0, SelectedRowStart).GetString() <>"" Then	
+					If SelectedColStart = 1 Then	'if we are searching for the first name
+						newRecordIDName = Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":" & changedName & " " & Sheet.getCellByPosition(2, SelectedRowStart).GetString()
+					Else '=2 (last name)
+						newRecordIDName = Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":" & Sheet.getCellByPosition(1, SelectedRowStart).GetString() & " " & changedName
+					End If
+					RangeToSearch = PositionsSheet.getCellRangeByPosition(3, HEADER_ROWS_PER_SHEET, 3, PositionsCount)
+					foundCell = SimpleSheetSearch(Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":", RangeToSearch, False)
+					If NOT IsNull(foundCell) Then
+						oldRecordIDName = Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":" & ReturnNextOf(foundCell.GetString(), ":")
+						If oldRecordIDName <> newRecordIDName Then
+							SimpleSheetReplace( oldRecordIDName, newRecordIDName, RangeToSearch, False )
+						End If
+					End If
+				ElseIf Sheet.Name = POSITIONS_SHEETNAME AND Sheet.getCellByPosition(0, SelectedRowStart).GetString() <>"" Then
+					newRecordIDName = Sheet.getCellByPosition(0, SelectedRowStart).String & ":" & changedName
+					RangeToSearch = Sheet.getCellRangeByPosition(4, HEADER_ROWS_PER_SHEET, 4, PositionsCount)
+					foundCell = SimpleSheetSearch(Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":", RangeToSearch, False)
+					If NOT IsNull(foundCell) Then
+						'we may have found the value in the cell, but this column is multi-value column 
+						'and we sould extract the specific value from the delimited string
+						Dim DelimitedStringLeft As String, tempPosition As String
+						DelimitedStringLeft = foundCell.GetString()
+						Do While DelimitedStringLeft <> ""
+							tempPosition = FindFirstIn(DelimitedStringLeft)
+							If InStr(tempPosition, Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":") >0 Then
+								oldRecordIDName = Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":" & ReturnNextOf(tempPosition, ":")
+								Exit Do
+							End If
+							DelimitedStringLeft = ReturnNextOf(DelimitedStringLeft)
+						Loop
+						If oldRecordIDName <> newRecordIDName Then
+							SimpleSheetReplace( oldRecordIDName, newRecordIDName, RangeToSearch, False )
+						End If
+					End If				
+				ElseIf Sheet.Name = ORGUNITS_SHEETNAME AND Sheet.getCellByPosition(0, SelectedRowStart).GetString() <>"" AND PositionsCount > 0 Then		
+					newRecordIDName = Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":" & changedName
+					RangeToSearch1 = PositionsSheet.getCellRangeByPosition(2, HEADER_ROWS_PER_SHEET, 2, PositionsCount)
+					RangeToSearch2 = Sheet.getCellRangeByPosition(2, HEADER_ROWS_PER_SHEET, 2, OrgUnitsCount)
+					foundCell = SimpleSheetSearch(Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":", RangeToSearch1, False)
+					If NOT IsNull(foundCell) Then
+						oldRecordIDName = Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":" & ReturnNextOf(foundCell.GetString(), ":")
+						If oldRecordIDName <> newRecordIDName Then
+							SimpleSheetReplace( oldRecordIDName, newRecordIDName, RangeToSearch1, False )
+							SimpleSheetReplace( oldRecordIDName, newRecordIDName, RangeToSearch2, False )
+						End If
+					Else
+						foundCell = SimpleSheetSearch(Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":", RangeToSearch2, False)
+						If NOT IsNull(foundCell) Then
+							oldRecordIDName = Sheet.getCellByPosition(0, SelectedRowStart).GetString() & ":" & ReturnNextOf(foundCell.GetString(), ":")
+							If oldRecordIDName <> newRecordIDName Then
+								SimpleSheetReplace( oldRecordIDName, newRecordIDName, RangeToSearch1, False )
+								SimpleSheetReplace( oldRecordIDName, newRecordIDName, RangeToSearch2, False )
+							End If
+						End If						
+					End If
+				End If
+			End If
+			Call UpdateSheetColumnsValidation(Sheet.Name)
+		End If
+		'If modified cell belongs to new row (no ID), add new ID in first column
+		If Sheet.getCellByPosition(0, SelectedRowStart).Formula = "" AND Sheet.getCellByPosition(SelectedColStart, SelectedRowStart).Formula <> "" Then
+			If SelectedRowStart > HEADER_ROWS_PER_SHEET AND last_record_row >= HEADER_ROWS_PER_SHEET Then	'current row is after the first record row
+				idRange = Sheet.getCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 0, last_record_row)
+				MaximumRowID = idRange.computeFunction(com.sun.star.sheet.GeneralFunction.MAX)
+			Else
+				MaximumRowID = 0	'if modified cell belongs to first record line (after header line), then start over counting IDs
+			End If
+			Sheet.getCellByPosition(0, SelectedRowStart).Value = MaximumRowID + 1
+			UpdateSheetColumnsValidation(Sheet.Name)
+		End If
+	End If
+End Sub
+
+
+Function GetLastUsedColumn(oSheet As Object) As Long
+  Dim oCursor
+  oCursor = oSheet.createCursor
+  oCursor.GotoEndOfUsedArea(True)
+  GetLastUsedColumn = oCursor.RangeAddress.EndColumn
+End Function
+
+
+Function GetLastUsedRow(oSheet As Object) As Long
+  Dim oCursor
+  oCursor = oSheet.createCursor
+  oCursor.GotoEndOfUsedArea(True)
+  GetLastUsedRow = oCursor.RangeAddress.EndRow
+End Function
+
+
+Function GetSelectedColumnStart(oSheet As Object) As Long
+	Dim Doc As Object
+
+	Doc = ThisComponent
+	GetSelectedColumnStart = Doc.CurrentSelection.getRangeAddress.StartColumn 
+End Function
+
+Function GetSelectedColumnEnd(oSheet As Object) As Long
+	Dim Doc As Object
+
+	Doc = ThisComponent
+	GetSelectedColumnEnd = Doc.CurrentSelection.getRangeAddress.EndColumn 
+End Function
+
+Function GetSelectedRowStart(oSheet As Object) As Long
+	Dim Doc As Object
+
+	Doc = ThisComponent
+	GetSelectedRowStart = Doc.CurrentSelection.getRangeAddress.StartRow
+End Function
+
+Function GetSelectedRowEnd(oSheet As Object) As Long
+	Dim Doc As Object
+
+	Doc = ThisComponent
+	GetSelectedRowEnd = Doc.CurrentSelection.getRangeAddress.EndRow 
+End Function
+
+REM Find the first cell that contains sString$
+REM If bWholeWord is True, then the cell must contain ONLY the text
+REM as indicated. If bWholeWord is False, then the cell must only contain
+REM the requested string.
+Function SimpleSheetSearch(sString$, oSheet, bWholeWord As Boolean, Optional findNext As Boolean) As Variant
+  Dim oDescriptor
+  Dim oFound
+  REM Create a descriptor from a searchable document.
+  oDescriptor = oSheet.createSearchDescriptor()
+  REM Set the text for which to search and other 
+  REM http://api.openoffice.org/docs/common/ref/com/sun/star/util/SearchDescriptor.html 
+  With oDescriptor
+    .SearchString = sString$
+    REM These all default to false
+    REM SearchWords forces the entire cell to contain only the search string
+    .SearchWords = bWholeWord
+    .SearchCaseSensitive = False
+  End With
+  REM Find the first one
+  If IsMissing(findNext) Then
+	  oFound = oSheet.findFirst(oDescriptor)
+  Else
+  	If findNext = True Then
+	  REM Do you really want to find more instances
+	  REM You can continue the search using a cell if you want!
+	  'Do While Not IsNull(oFound)
+	  '  Print oFound.getString()
+	  oFound = oSheet.findNext( oFound, oDescriptor)
+	  'Loop
+  	End If
+  End If
+  SimpleSheetSearch = oFound
+End Function
+
+
+Function SimpleSheetReplace(sToFind$, sReplaceWith$, oSheet, bWholeWord As Boolean) As Variant
+  Dim oDescriptor
+  Dim oFound
+  REM Create a descriptor from a searchable document.
+  oDescriptor = oSheet.createReplaceDescriptor()
+  With oDescriptor
+    .SearchString = sToFind$
+    .ReplaceString = sReplaceWith$
+    REM These all default to false
+    REM SearchWords forces the entire cell to contain only the search string
+    .SearchWords = bWholeWord
+    .SearchCaseSensitive = False
+  End With
+  REM Find the first one
+  oFound = oSheet.ReplaceAll(oDescriptor)
+  SimpleSheetReplace = oFound
+End Function
+
+
+Function FindAutoReference( CellRange As Object, ReferenceColumn As Long) As Long
+	Dim retVal As Long
+	
+	retVal = -1
+	If ReferenceColumn > 0 Then
+		DataArray = CellRange.getDataArray()
+		For x = 0 to UBound(DataArray)
+			If DataArray(x)(0) & ":" & DataArray(x)(1) = DataArray(x)(ReferenceColumn) Then
+				retVal = x
+				Exit For
+			End If
+		Next x	
+	End If
+	FindAutoReference = retVal
+End Function
+
+Function FindDuplicates( CellRange As Object )
+	Dim results As String
+	Dim Duplicates As Integer
+	
+	IDArray = CellRange.data
+	SheetName = CellRange.GetSpreadsheet().Name
+	Duplicates = 0
+	For x = 0 to UBound(IDArray)
+		For y = x+1 to UBound(IDArray)
+			If IDArray(y)(0) = IDArray(x)(0) Then
+				results = results + "," + Chr(13) + IDArray(x)(0)
+				Duplicates = Duplicates + 1
+			End If
+		'print IDArray(x)(0)
+		Next
+	Next
+	'CellRange.data = IDArray
+	If Duplicates > 0 then
+		MsgBox "Οι ακόλουθες τιμές της πρώτης στήλης Α/Α δεν είναι μοναδικές στο φύλλο """ + SheetName + """" + results, 16, "Σφάλμα ακεραιότητας οργανογράμματος" 
+	End If
+	FindDuplicates = Duplicates
+End Function
+
+
+Sub NewSheet (SheetName As String)
+'If we would like to create a new template sheet instead of using an existing one, then this will do the job
+	Dim Doc As Object
+	Dim Sheet As Object
+	Dim Cell As Object
+	Dim HeaderRow As Object
+	 
+	Doc = ThisComponent
+	
+	If Doc.Sheets.hasByName(SheetName) Then
+		Sheet = Doc.Sheets.getByName(SheetName)
+	Else
+		Sheet = Doc.createInstance("com.sun.star.sheet.Spreadsheet")
+		Doc.Sheets.insertByName(SheetName, Sheet)
+		HeaderRow = Sheet.Rows(0)
+		Cell = Sheet.getCellByPosition(0, 0)
+		Cell.String = "A/A"
+		Cell = Sheet.getCellByPosition(0, 0)
+		Cell.String = "Όνομα"
+		Cell = Sheet.getCellByPosition(1, 0)
+		Cell.String = "Επώνυμο"
+		Cell = Sheet.getCellByPosition(2, 0)
+		Cell.String = "Φύλλο"
+		Cell = Sheet.getCellByPosition(3, 0)
+		Cell.String = "Ημερομηνία Γέννησης"
+		last_record_row = 0
+		'Change the background color to Yellow
+		HeaderRow.CellBackColor = RGB (255, 255, 0)
+		'Change the font to Bold
+		HeaderRow.CharWeight = com.sun.star.awt.FontWeight.BOLD 
+		'Enable the text wrapping inside cells
+		HeaderRow.IsTextWrapped = True
+	End If
+End Sub
+
+
+Sub InsertNewRecordMethod (SheetName As String)
+	Dim Doc As Object
+	Dim Sheet As Object
+	Dim SelectedRow As Long
+	Dim MaximumRowID As Long
+	
+	Dim CellRangeAddress As New com.sun.star.table.CellRangeAddress
+	Dim CellAddress As New com.sun.star.table.CellAddress
+
+	Doc = ThisComponent
+	
+	If Doc.Sheets.hasByName(SheetName) Then
+		Sheet = Doc.Sheets.getByName(SheetName)
+		last_record_row = GetLastUsedRow(Sheet)
+		If last_record_row < Sheet.getRangeAddress().EndRow - 1 Then
+			SelectedRow = Doc.CurrentSelection.getRangeAddress.StartRow 
+			'Find maximum ID in first column
+			idRange = Sheet.getCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 0, last_record_row)
+			MaximumRowID = idRange.computeFunction(com.sun.star.sheet.GeneralFunction.MAX)
+			'If selected cell (current) was way below last line, then append a row at the end
+			If SelectedRow > last_record_row Then
+				SelectedRow = last_record_row + 1
+			End If
+			'Print SelectedRow
+			Sheet.Rows.InsertByIndex( SelectedRow, 1)
+			Sheet.getCellByPosition(0, SelectedRow).SetValue(MaximumRowID + 1)
+			last_record_row = MaximumRowID + 1
+			'Now, fix the validation formula:
+			Call UpdateSheetColumnsValidation(SheetName)		
+		End If
+	End If
+End Sub
+
+Sub RemoveRecordMethod (SheetName As String)
+	Dim Doc As Object
+	Dim Sheet As Object
+	Dim SelectedRow As Integer
+	
+	Dim CellRangeAddress As New com.sun.star.table.CellRangeAddress
+	Dim CellAddress As New com.sun.star.table.CellAddress
+	Dim EndColumn As Integer
+	Dim ValidRows As Integer
+
+	Doc = ThisComponent
+	
+	If Doc.Sheets.hasByName(SheetName) Then
+		Sheet = Doc.Sheets.getByName(SheetName)
+		last_record_row = GetLastUsedRow(Sheet)
+		If MsgBox("Η λειτουργία αυτή πρόκειται να διαγράψει εγγραφές στο φύλλο εργασίας " & SheetName & ". Θέλετε να συνεχίσετε;", MB_OKCANCEL + MB_ICONQUESTION, "Επιβεβαίωση εισαγωγής στοιχείων") <> IDOK Then
+			Exit Sub
+		End If 
+		If last_record_row < Sheet.getRangeAddress().EndRow - 1 Then
+			SelectedRowStart = Doc.CurrentSelection.getRangeAddress.StartRow 
+			SelectedRowEnd = Doc.CurrentSelection.getRangeAddress.EndRow 
+			'Print SelectedRow
+			Sheet.Rows.RemoveByIndex( SelectedRowStart, SelectedRowEnd - SelectedRowStart + 1)
+			last_record_row = last_record_row - (SelectedRowEnd - SelectedRowStart + 1)
+			'Re-index first ID field for all succeeding rows | ON SECOND THOUGHT, JUST LEAVE THE IDS AS THEY ARE,
+			' CAUSE IF THEY CHANGE THEY WILL BREAK THE INTEGRITY OF ALL RELATIONSHIPS IN THIS AND OTHER SHEETS
+			'For i = SelectedRowStart To last_record_row
+			'	Sheet.GetCellByPosition(0, i).SetValue(Sheet.GetCellByPosition(0, i - 1).GetValue + 1)
+			'Next
+			'Now, fix the validation formula:
+			Call UpdateSheetColumnsValidation(SheetName)		
+		End If
+	End If
+End Sub
+
+
+Sub ResetColumnsValidation
+	Dim Sheet, OrgUnitsSheet, PositionsSheet As Object
+
+	Doc = ThisComponent
+	
+	If Doc.Sheets.hasByName(ORGUNITS_SHEETNAME) AND Doc.Sheets.hasByName(POSITIONS_SHEETNAME) Then
+		OrgUnitsSheet = Doc.Sheets.getByName(ORGUNITS_SHEETNAME)
+		PositionsSheet = Doc.Sheets.getByName(POSITIONS_SHEETNAME)
+		
+		OrgUnitCount = GetLastUsedRow( OrgUnitsSheet )
+		If OrgUnitCount > HEADER_ROWS_PER_SHEET Then
+			Set CellRange = OrgUnitsSheet.getCellRangeByPosition(2, HEADER_ROWS_PER_SHEET, 2, OrgUnitCount) 
+			Set Validation = CellRange.Validation 
+			Validation.Type = com.sun.star.sheet.ValidationType.ANY
+			Set CellRange.Validation = Validation
+		End If
+		PositionCount = GetLastUsedRow( PositionsSheet )
+		If PositionCount > HEADER_ROWS_PER_SHEET Then
+			Set CellRange = PositionsSheet.getCellRangeByPosition(2, HEADER_ROWS_PER_SHEET, 2, PositionCount) 
+			Set Validation = CellRange.Validation 
+			Validation.Type = com.sun.star.sheet.ValidationType.ANY
+			Set CellRange.Validation = Validation
+		End If
+		If PositionCount > HEADER_ROWS_PER_SHEET Then
+			Set CellRange = PositionsSheet.getCellRangeByPosition(4, HEADER_ROWS_PER_SHEET, 4, PositionCount) 
+			Set Validation = CellRange.Validation 
+			Validation.Type = com.sun.star.sheet.ValidationType.ANY
+			Set CellRange.Validation = Validation
+		End If
+		If PositionCount > HEADER_ROWS_PER_SHEET Then
+			Set CellRange = PositionsSheet.getCellRangeByPosition(3, HEADER_ROWS_PER_SHEET, 3, PositionCount) 
+			Set Validation = CellRange.Validation 
+			Validation.Type = com.sun.star.sheet.ValidationType.ANY
+			Set CellRange.Validation = Validation
+		End If
+	End If
+End Sub
+
+
+Sub UpdateSheetColumnsValidation ( SheetName As String )
+	Dim Doc As Object
+	Dim Sheet, PersonsSheet, OrgUnitsSheet, PositionsSheet As Object
+
+	Doc = ThisComponent
+	
+	If Doc.Sheets.hasByName(SheetName) Then
+		Sheet = Doc.Sheets.getByName(SheetName)
+		last_record_row = GetLastUsedRow( Sheet ) + 1
+		If last_record_row < Sheet.getRangeAddress().EndRow Then
+			'For sheet ΟργανικέςΜονάδες, affects ΟργανικέςΜονάδες:Column_C and Θέσεις:Column_C
+			'For sheet Θέσεις, affects Θέσεις:Column_E
+			'For Sheet Πρόσωπα, affects Θέσεις:Column_D 
+			If SheetName = ORGUNITS_SHEETNAME Then
+				If last_record_row -1 >= HEADER_ROWS_PER_SHEET Then
+					Set CellRange = Sheet.getCellRangeByPosition(2, HEADER_ROWS_PER_SHEET, 2, last_record_row-1) 
+					UpdateCellRangeValidation( CellRange, "CONCATENATE($A$2:$A$" + last_record_row + ";"":"";$B$2:$B$" + last_record_row + ")" )
+				End If
+				PositionsSheet = Doc.Sheets.getByName(POSITIONS_SHEETNAME)
+				Positions = GetLastUsedRow( PositionsSheet ) + 1
+				If Positions > HEADER_ROWS_PER_SHEET Then
+					Set CellRange = PositionsSheet.getCellRangeByPosition(2, HEADER_ROWS_PER_SHEET, 2, Positions-1) 
+					UpdateCellRangeValidation( CellRange, "CONCATENATE($" & ORGUNITS_SHEETNAME & ".$A$2:$A$" + last_record_row + ";"":"";$" & ORGUNITS_SHEETNAME & ".$B$2:$B$" + last_record_row + ")" )
+				End If
+			ElseIf SheetName = POSITIONS_SHEETNAME Then
+				If last_record_row -1 >= HEADER_ROWS_PER_SHEET Then
+					Set CellRange = Sheet.getCellRangeByPosition(4, HEADER_ROWS_PER_SHEET, 4, last_record_row-1) 
+					UpdateCellRangeValidation( CellRange, "CONCATENATE($A$2:$A$" + last_record_row + ";"":"";$B$2:$B$" + last_record_row + ")" )
+				End If
+				PersonsSheet = Doc.Sheets.getByName(PERSONS_SHEETNAME)
+				Persons = GetLastUsedRow( PersonsSheet ) + 1
+				If Persons > HEADER_ROWS_PER_SHEET AND last_record_row -1 >= HEADER_ROWS_PER_SHEET Then
+					Set CellRange = Sheet.getCellRangeByPosition(3, HEADER_ROWS_PER_SHEET, 3, last_record_row-1) 
+					UpdateCellRangeValidation( CellRange, "CONCATENATE($" & PERSONS_SHEETNAME & ".$A$2:$A$" + Persons + ";"":"";$" & PERSONS_SHEETNAME & ".$B$2:$B$" + _
+					 Persons + ";"" "";$" & PERSONS_SHEETNAME & ".$C$2:$C$" + Persons + ")" )
+				End If
+				OrgUnitsSheet = Doc.Sheets.getByName(ORGUNITS_SHEETNAME)
+				Units = GetLastUsedRow( OrgUnitsSheet ) + 1
+				If Units > HEADER_ROWS_PER_SHEET AND last_record_row -1 >= HEADER_ROWS_PER_SHEET Then
+					Set CellRange = Sheet.getCellRangeByPosition(2, HEADER_ROWS_PER_SHEET, 2, last_record_row-1) 
+					UpdateCellRangeValidation( CellRange, "CONCATENATE($" & ORGUNITS_SHEETNAME & ".$A$2:$A$" + Units + ";"":"";$" & ORGUNITS_SHEETNAME & ".$B$2:$B$" + _
+					 Units + ")" )
+				End If
+			ElseIf SheetName = PERSONS_SHEETNAME Then
+				PositionsSheet = Doc.Sheets.getByName(POSITIONS_SHEETNAME)
+				Positions = GetLastUsedRow( PositionsSheet ) + 1
+				Persons = GetLastUsedRow( Sheet ) + 1
+				If Positions > HEADER_ROWS_PER_SHEET Then
+					Set CellRange = PositionsSheet.getCellRangeByPosition(3, HEADER_ROWS_PER_SHEET, 3, Positions-1) 
+					UpdateCellRangeValidation( CellRange, "CONCATENATE($" & PERSONS_SHEETNAME & ".$A$2:$A$" + Persons + ";"":"";$" & PERSONS_SHEETNAME & ".$B$2:$B$" + _
+					 Persons + ";"" "";$" & PERSONS_SHEETNAME & ".$C$2:$C$" + Persons + ")" )
+				End If
+			End If
+		End If
+	End If
+End Sub
+
+Sub UpdateCellRangeValidation ( CellRange As Object, Formula As String )
+	Set Validation = CellRange.Validation 
+	Validation.Type = 6 'com.sun.star.sheet.ValidationType.TEXT_LEN ?
+	Validation.ShowErrorMessage = True 
+	Validation.ErrorMessage = "Επιλέξτε κενό ή τιμές από τη λίστα!" 
+	Validation.ErrorTitle = "Σφάλμα συμπλήρωσης" 
+	Validation.ShowInputMessage = True 
+	'Validation.InputTitle = "Δυνατές τιμές:" 
+	'Validation.InputMessage = "Παρακαλώ επιλέξτε τιμή από τη λίστα" 
+	Validation.ErrorAlertStyle = com.sun.star.sheet.ValidationAlertStyle.STOP 
+	Validation.setOperator  com.sun.star.Sheet.ConditionOperator.BETWEEN 
+	'Set oCell = oSheet.getCellByPosition(4, 4) 
+	'Set aCellAddress = oCell.getCellAddress 
+	'Validation.setSourcePosition aCellAddress 'com.sun.star.table.CellAddress 
+	Validation.setFormula1 Formula
+	'Validation.ShowList = com.sun.star.sheet.TableValidationVisibility.SORTEDASCENDING 
+	Set CellRange.Validation = Validation 
+End Sub
+
+
+
+Function FindStringInArray(something As String, someArray As Array, Optional startFrom As Long) As Integer
+	Dim cntr As Long
+	FindStringInArray = -1
+	If IsMissing(startFrom) Then
+		startFrom = LBound(someArray)
+	End If
+	For cntr = startFrom to UBound(someArray) 
+		If someArray(cntr) = something Then
+			FindStringInArray = cntr
+			Exit For
+		End If
+	Next
+End Function
+
+Public Function GetFromShapeArray(something As String, someArray As Array)
+	Dim returnValue As Object
+	Dim cntr As Integer
+	
+	returnValue = Nothing
+	For cntr = LBound(someArray) to UBound(someArray) 
+		If NOT IsNull(someArray(cntr)) Then
+			If someArray(cntr).String = something Then
+				returnValue = someArray(cntr)
+				Exit For
+			End If
+		End If
+	Next
+	GetFromShapeArray = returnValue
+End Function
+
+'--------------------------------------------------------------------------------------
+'Here starts the MultiValueContainer Dialog part of the code
+'Here go all those global objects and variables
+Dim MultipleValueContainerDialog As Object
+Const MultipleValuesDelimiter As String = ";"
+
+
+Sub CallMultiValueContainerDialog
+	Dim Sheet As Object
+	Dim SelectedRowValue As Integer, SelectedColumnValue As Integer
+	
+	Sheet = ThisComponent.GetCurrentController.ActiveSheet
+
+	Instances = GetLastUsedRow(Sheet)
+	SelectedRowValue = ThisComponent.CurrentSelection.getRangeAddress().StartRow
+	SelectedColumnValue = ThisComponent.CurrentSelection.getRangeAddress().StartColumn
+	If SelectedRowValue > Instances Then
+		SelectedRowValue = Instances
+	End If
+	'If SelectedRowValue <= Instances AND (Sheet.Name = ORGUNITS_SHEETNAME OR Sheet.Name = POSITIONS_SHEETNAME OR Sheet.Name = PERSONS_SHEETNAME) Then	
+	If Sheet.Name = ORGUNITS_SHEETNAME OR Sheet.Name = POSITIONS_SHEETNAME OR Sheet.Name = PERSONS_SHEETNAME Then	
+		DialogLibraries.LoadLibrary("Standard")
+		MultipleValueContainerDialog = CreateUnoDialog(DialogLibraries.Standard.MultiValueContainerDialog)
+		MultipleValueContainerDialog.getControl("SelectedRow").Text = SelectedRowValue
+		MultipleValueContainerDialog.getControl("SelectedColumn").Text = SelectedColumnValue
+		Call UpdateMultiValueContainerDialog	
+		If MultipleValueContainerDialog.Execute() = 1 Then
+			Call UpdateCellWithColumnValues
+		End If
+		MultipleValueContainerDialog.EndExecute()
+		'MultipleValueContainerDialog.Dispose()	
+	End If
+End Sub
+
+
+
+Sub UpdateMultiValueContainerDialog
+	Dim SelectedRow As Integer, SelectedColumn As Integer, Columns As Integer, Rows As Integer
+	
+	Sheet = ThisComponent.GetCurrentController.ActiveSheet
+	
+	Columns = GetLastUsedColumn(Sheet)
+	Rows = GetLastUsedRow(Sheet)
+	EntityName = MultipleValueContainerDialog.getControl("EntityName")
+	SelectedRow = MultipleValueContainerDialog.getControl("SelectedRow").Text
+	SelectedColumn = MultipleValueContainerDialog.getControl("SelectedColumn").Text
+	Dim MultiValueColumnStart As Integer
+	Dim MultiValueRowStart As Integer
+	MultiValueRowStart = HEADER_ROWS_PER_SHEET
+	If Sheet.Name = ORGUNITS_SHEETNAME Then
+		EntityName.Text = "Οργανική Μονάδα:"
+		MultiValueColumnStart = 3
+	ElseIf Sheet.Name = POSITIONS_SHEETNAME Then
+		EntityName.Text = "Θέση Εργασίας:"
+		MultiValueColumnStart = 4
+	ElseIf Sheet.Name = PERSONS_SHEETNAME Then
+		EntityName.Text = "Πρόσωπο:"
+		MultiValueColumnStart = 3
+	End If
+	ColumnHeaderName = MultipleValueContainerDialog.getControl("ColumnHeaderName")
+	If (SelectedColumn >= MultiValueColumnStart) AND (SelectedColumn <= Columns) Then
+		ColumnHeaderName.Text = Sheet.GetCellByPosition(SelectedColumn, 0).String
+	Else
+		ColumnHeaderName.Text = Sheet.GetCellByPosition(MultiValueColumnStart, 0).String
+		MultipleValueContainerDialog.getControl("SelectedColumn").Text = MultiValueColumnStart
+	End If
+	If (SelectedRow < MultiValueRowStart) OR (SelectedRow > Rows) Then
+		MultipleValueContainerDialog.getControl("SelectedRow").Text = MultiValueRowStart
+	End If
+	SelectedRow = MultipleValueContainerDialog.getControl("SelectedRow").Text
+	SelectedColumn = MultipleValueContainerDialog.getControl("SelectedColumn").Text
+	'Get the selected by the dialog range and select in the Sheet
+	CellRange = Sheet.GetCellRangeByPosition(SelectedColumn, SelectedRow, SelectedColumn, SelectedRow)
+	ThisComponent.CurrentController.Select(CellRange)
+	Cell = Sheet.GetCellByPosition(SelectedColumn, SelectedRow)
+	EntityInstanceName = MultipleValueContainerDialog.getControl("EntityInstanceName")
+	EntityInstanceName.Text = Sheet.GetCellByPosition(0, SelectedRow).String + ":" + Sheet.GetCellByPosition(1, SelectedRow).String
+	'Fill the ColumnValues listbox with values delimited in Cell(SelectedColumn, SelectedRow)
+	ColumnValues = MultipleValueContainerDialog.getControl("ColumnValues")
+	Cell = Sheet.GetCellByPosition(MultipleValueContainerDialog.getControl("SelectedColumn").Text, MultipleValueContainerDialog.getControl("SelectedRow").Text)
+	'But first empty the listbox from previous "garbage"
+	ColumnValues.removeItems(0, ColumnValues.getItemCount() )
+	Dim DelimitedStringLeft As String
+	DelimitedStringLeft = Cell.String
+	Do While DelimitedStringLeft <> ""
+		ColumnValues.addItem( FindFirstIn(DelimitedStringLeft), ColumnValues.getItemCount() )
+		DelimitedStringLeft = ReturnNextOf(DelimitedStringLeft)
+	Loop
+	'Now, if we are in "Αναφέρεται σε Θέση" column, then switch to Step2 of this dialog,
+	' enabling the ColumnValueCombo control instead of ColumnValue
+	If Sheet.Name = POSITIONS_SHEETNAME AND (SelectedColumn = 4 OR SelectedColumn = 5) Then
+		MultipleValueContainerDialog.Model.Step = 2
+		'Get handler to ColumnValueCombo control
+		ColumnValueCombo = MultipleValueContainerDialog.getControl("ColumnValueCombo")
+		'Fill in the combo list by copying in an Array the used Column range and then adding to the control
+		'But first empty the listbox from previous "garbage"
+		ColumnValueCombo.removeItems(0, ColumnValueCombo.getItemCount() )
+		If Rows >= HEADER_ROWS_PER_SHEET Then
+			If SelectedColumn = 4 Then
+				Set CellRange = Sheet.getCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 1, Rows) 
+				PositionArray = CellRange.getDataArray()
+				Dim PositionIDArray(UBound(PositionArray)) As String
+				For i = 0 To UBound(PositionArray)
+					PositionIDArray(i) = PositionArray(i)(0) & ":" & PositionArray(i)(1)
+				Next i
+				ColumnValueCombo.addItems( PositionIDArray, 0)
+			ElseIf SelectedColumn = 5 AND ThisComponent.Sheets.hasByName(RESPONSIBILITIES_SHEETNAME)Then
+				Set ResponsibilitiesSheet = ThisComponent.Sheets.getByName(RESPONSIBILITIES_SHEETNAME)
+				Set CellRange = ResponsibilitiesSheet.getCellRangeByPosition(0, HEADER_ROWS_PER_SHEET, 1, GetLastUsedRow(ResponsibilitiesSheet)) 
+				ResponsibilitiesArray = CellRange.getDataArray()
+				Dim ResponsibilitiesIDArray(UBound(ResponsibilitiesArray)) As String
+				For i = 0 To UBound(ResponsibilitiesArray)
+					ResponsibilitiesIDArray(i) = ResponsibilitiesArray(i)(0) & ":" & ResponsibilitiesArray(i)(1)
+				Next i
+				ColumnValueCombo.addItems( ResponsibilitiesIDArray, 0)
+			End If
+		End If
+	Else
+		MultipleValueContainerDialog.Model.Step = 1
+	End If
+End Sub
+
+Sub UpdateCellWithColumnValues
+	Dim Sheet As Object
+	
+	Sheet = ThisComponent.GetCurrentController.ActiveSheet
+	
+	Columns = GetLastUsedColumn(Sheet)
+	ColumnValues = MultipleValueContainerDialog.getControl("ColumnValues")
+	SelectedRow = MultipleValueContainerDialog.getControl("SelectedRow").Text
+	SelectedColumn = MultipleValueContainerDialog.getControl("SelectedColumn").Text
+	Cell = Sheet.GetCellByPosition(SelectedColumn, SelectedRow)
+	Dim NewValue As String
+	If ColumnValues.getItemCount() > 0 Then
+		NewValue = ColumnValues.getItem(0)
+		For i = 1 To (ColumnValues.getItemCount()-1)
+			NewValue = NewValue & MultipleValuesDelimiter & Chr(13) & ColumnValues.getItem(i)
+		Next
+		Cell.String = NewValue
+	Else
+		Cell.String = ""
+	End If
+End Sub
+
+
+Sub KeyPressedOnColumnValue(Event As Object)
+'For Keycodes and other events see codesnippet here:
+'http://wiki.services.openoffice.org/wiki/Documentation/BASIC_Guide/Events
+	'If Event.KeyCode = com.sun.star.awt.Key.RETURN Then
+	'	Call InsertColumnValueInColumnValues
+	'End If
+End Sub
+
+Sub KeyPressedOnMultiValueContainerDialog(Event As Object)
+'For Keycodes and other events see codesnippet here:
+'http://wiki.services.openoffice.org/wiki/Documentation/BASIC_Guide/Events
+	'If Event.KeyCode = com.sun.star.awt.Key.ESCAPE Then
+	'	Call MultipleValueContainerCancel
+	'End If
+End Sub
+
+
+Sub ModifySelectedColumnValue
+	ColumnValues = MultipleValueContainerDialog.getControl("ColumnValues")
+	If ColumnValues.getSelectedItemPos() >= 0 Then
+		If MultipleValueContainerDialog.Model.Step <= 1 Then
+			ColumnValue = MultipleValueContainerDialog.getControl("ColumnValue")	
+			ColumnValue.Text = ColumnValues.getSelectedItem()
+		Else
+			ColumnValue = MultipleValueContainerDialog.getControl("ColumnValueCombo")		
+		End If
+		ColumnValues.removeItems( ColumnValues.getSelectedItemPos(), 1 )
+	End If
+End Sub
+
+Sub InsertColumnValueInColumnValues
+	ColumnValues = MultipleValueContainerDialog.getControl("ColumnValues")
+	If MultipleValueContainerDialog.Model.Step <= 1 Then
+		ColumnValue = MultipleValueContainerDialog.getControl("ColumnValue")
+	Else
+		ColumnValue = MultipleValueContainerDialog.getControl("ColumnValueCombo")	
+	End If
+	If ColumnValue.Text <> "" Then
+		ColumnValues.addItem( ColumnValue.Text, ColumnValues.getItemCount() )
+	End If
+End Sub
+
+Function FindFirstIn( Delimited As String, optional delimiter As String ) As String
+	Dim CurrentPos As Integer
+	
+	If IsMissing(delimiter) Then
+		delimiter = MultipleValuesDelimiter
+	End If
+	CurrentPos = InStr(Delimited, delimiter)
+	If CurrentPos = 0 Then
+		FindFirstIn = Delimited
+	Else
+		FindFirstIn = Left(Delimited, CurrentPos -1)
+	End If
+End Function
+
+Function ReturnNextOf( Delimited As String, optional delimiter As String ) As String
+	Dim CurrentPos As Integer
+	
+	If IsMissing(delimiter) Then
+		delimiter = MultipleValuesDelimiter
+	End If
+	CurrentPos = InStr(Delimited, delimiter)
+	If CurrentPos = 0 Then
+		ReturnNextOf = ""
+	Else
+		ReturnNextOf = Right(Delimited, Len(Delimited) - CurrentPos)
+	End If
+End Function
+
+Sub NextColumn
+	Dim SelectedColumn As Integer
+	Call UpdateCellWithColumnValues	
+	SelectedColumn = MultipleValueContainerDialog.getControl("SelectedColumn").Text
+	MultipleValueContainerDialog.getControl("SelectedColumn").Text = SelectedColumn + 1
+	Call UpdateMultiValueContainerDialog
+End Sub
+
+
+Sub PreviousColumn
+	Dim SelectedColumn As Integer
+	Call UpdateCellWithColumnValues	
+	SelectedColumn = MultipleValueContainerDialog.getControl("SelectedColumn").Text
+	MultipleValueContainerDialog.getControl("SelectedColumn").Text = SelectedColumn - 1
+	Call UpdateMultiValueContainerDialog
+End Sub
+
+Sub NextRow
+	Dim SelectedRow As Integer
+	Call UpdateCellWithColumnValues	
+	SelectedRow = MultipleValueContainerDialog.getControl("SelectedRow").Text
+	MultipleValueContainerDialog.getControl("SelectedRow").Text = SelectedRow + 1
+	Call UpdateMultiValueContainerDialog
+End Sub
+
+
+Sub PreviousRow
+	Dim SelectedRow As Integer
+	Call UpdateCellWithColumnValues	
+	SelectedRow = MultipleValueContainerDialog.getControl("SelectedRow").Text
+	MultipleValueContainerDialog.getControl("SelectedRow").Text = SelectedRow - 1
+	Call UpdateMultiValueContainerDialog
+End Sub
+
+Sub MultipleValueContainerOK
+	Call UpdateCellWithColumnValues	
+	MultipleValueContainerDialog.EndExecute()
+	If IsNull(oKeyHandler) Then
+		RegisterKeyHandler
+	End If
+End Sub
+
+Sub MultipleValueContainerCancel
+	MultipleValueContainerDialog.EndExecute()
+End Sub
+
+
+
+'--------------------------------------------------------------------------------------
+'Here starts the Dlg_export_xml Dialog part of the code
+
+'Here go all those global objects and variables
+Dim Dlg_export_xml As Object
+Dim Dlg_import_xml As Object
+Sub create_xml_file
+	''This Script calls BeanShell script to create xml export document
+    dim oSP as object
+    dim oScript as object
+    dim Array()
+    dim cell_save_path as object
+    dim txt_path as object
+    txt_path = Dlg_export_xml.getControl("txt_path")
+    ''create path settings
+    Sheet_settings = ThisComponent.Sheets.getByIndex(0)
+    cell_save_path = Sheet_settings.getCellByPosition(2,7)
+    cell_save_path.String = txt_path.Text       
+    const PATH_TO_SCRIPT = "vnd.sun.star.script:xml_script.create_xml.bsh?language=BeanShell&location=document"
+    oSP    = ThisComponent.getScriptProvider("")
+    oScript = oSP.getScript(PATH_TO_SCRIPT)
+    ConvertFormula2Latex = oScript.invoke(Array(), Array(), Array()) 
+	MsgBox "Η εξαγωγή του οργανογράμματος πραγματοποιήθηκε με επιτυχία!" 
+	Dlg_export_xml.endExecute()
+End Sub
+
+
+Sub Show_xml_dialog_export
+ 
+    Dim ouRow As Integer
+    Dim ouCell As Integer
+    Dim endOu As Boolean
+    Dim nCount As Integer, oListBox As Object
+
+    DialogLibraries.LoadLibrary("Standard")
+    Dlg_export_xml = CreateUnoDialog(DialogLibraries.Standard.export_xml_dialog)
+
+    oListBox = Dlg_export_xml.getControl("lstOrgUnit")      
+    
+    endOu=false
+    ouRow=1
+    ouCell=1
+    
+    Sheet_organisation = ThisComponent.Sheets.getByIndex(0)
+    cell_save_path = Sheet_organisation.getCellByPosition(2,8)
+    cell_save_path.String=""  
+    
+    ''load organisation units
+    Sheet_organisation_unit = ThisComponent.Sheets.getByIndex(1)
+    
+    ''com.sun.star.table.CellContentType.EMPTY 
+    Do While (endOu=false)
+        CellOU = Sheet_organisation_unit.getCellByPosition(ouCell,ouRow) 
+        CellOUid = Sheet_organisation_unit.getCellByPosition(0,ouRow)
+        IF (CellOU.Type=com.sun.star.table.CellContentType.EMPTY) THEN
+            endOu=true
+        ELSE
+            nCount = oListBox.getItemCount()
+            oListBox.addItem(CellOUid.String+":"+CellOU.String , nCount )             
+        END IF
+        ouRow=ouRow+1   
+    Loop
+    Dlg_export_xml.Execute()
+    Dlg_export_xml.dispose()     
+
+End Sub
+
+Sub export_xml_select_ou
+
+    Dim nCount As Integer, oListBox As Object,oListBoxSelected As Object
+    Dim sSelectedItem As String    
+    Dim sSelectedPos As Integer
+    
+    oListBox = Dlg_export_xml.getControl("lstOrgUnit")
+    oListBoxSelected = Dlg_export_xml.getControl("lstSelOrgUnit")         
+    
+    sSelectedItem = oListBox.getSelectedItem()  
+    
+    Sheet_organisation = ThisComponent.Sheets.getByIndex(0)
+    cell_save_path = Sheet_organisation.getCellByPosition(2,8)
+    IF(cell_save_path.String="") THEN
+      cell_save_path.String=sSelectedItem  
+    ELSE
+     cell_save_path.String=cell_save_path.String+","+sSelectedItem
+    END IF       
+    nCount = oListBox.getItemCount()
+    oListBoxSelected.addItem(sSelectedItem , nCount ) 
+    oListBox.removeItems( oListBox.getSelectedItemPos(), 1 )   
+End Sub
+
+Sub clear_list
+
+    Dim endOu As Boolean
+    Dim nCount As Integer, oListBox As Object,oListBoxSelected As Object
+    Dim sSelectedItem As String    
+    Dim sSelectedPos As Integer
+    
+    endOu=false
+    ouRow=1
+    ouCell=1    
+    
+    Sheet_organisation_unit = ThisComponent.Sheets.getByIndex(1)    
+    oListBox = Dlg_export_xml.getControl("lstOrgUnit")
+    oListBoxSelected = Dlg_export_xml.getControl("lstSelOrgUnit")  
+    Sheet_organisation_unit = ThisComponent.Sheets.getByIndex(1)
+    nCount = oListBoxSelected.getItemCount()
+    oListBoxSelected.removeItems( 0, nCount ) 
+    
+    ''reload the list
+    nCount = oListBox.getItemCount()
+    oListBox.removeItems( 0, nCount )   
+     
+    Do While (endOu=false)
+        CellOU = Sheet_organisation_unit.getCellByPosition(ouCell,ouRow) 
+        CellOUid = Sheet_organisation_unit.getCellByPosition(0,ouRow)
+        IF (CellOU.Type=com.sun.star.table.CellContentType.EMPTY) THEN
+            endOu=true
+        ELSE
+            nCount = oListBox.getItemCount()
+            oListBox.addItem(CellOUid.String+":"+CellOU.String , nCount )             
+        END IF
+        ouRow=ouRow+1   
+    Loop    
+    
+End Sub
+
+Sub move_all_items
+    Dim endOu As Boolean
+    Dim nCount As Integer, oListBox As Object,oListBoxSelected As Object
+    Dim sSelectedItem As String    
+    Dim sSelectedPos As Integer
+    Dim isTheFirst As Boolean
+    endOu=false
+    ouRow=1
+    ouCell=1    
+    isTheFirst=true
+    Sheet_organisation_unit = ThisComponent.Sheets.getByIndex(1) 
+       
+    oListBox = Dlg_export_xml.getControl("lstOrgUnit")
+    oListBoxSelected = Dlg_export_xml.getControl("lstSelOrgUnit")  
+    
+    Sheet_organisation = ThisComponent.Sheets.getByIndex(0)
+    cell_save_path = Sheet_organisation.getCellByPosition(2,8)
+  
+    Do While (endOu=false)
+        CellOU = Sheet_organisation_unit.getCellByPosition(ouCell,ouRow) 
+        CellOUid = Sheet_organisation_unit.getCellByPosition(0,ouRow)
+        IF (CellOU.Type=com.sun.star.table.CellContentType.EMPTY) THEN
+            endOu=true
+        ELSE
+            nCount = oListBoxSelected.getItemCount()
+            oListBoxSelected.addItem(CellOUid.String+":"+CellOU.String , nCount ) 
+            IF(isTheFirst=true)THEN
+                cell_save_path.String=cell_save_path.String+CellOUid.String+":"+CellOU.String 
+                isTheFirst=false          
+            ELSE
+                cell_save_path.String=cell_save_path.String+","+CellOUid.String+":"+CellOU.String          
+            END IF
+        END IF
+        ouRow=ouRow+1   
+    Loop
+    
+    ''clean original list
+    nCount = oListBox.getItemCount()
+    oListBox.removeItems( 0, nCount ) 
+              
+End Sub
+
+Sub show_dialog_insert_xml
+
+    DialogLibraries.LoadLibrary("Standard")
+    Dlg_import_xml = CreateUnoDialog(DialogLibraries.Standard.import_xml_dialog)
+	
+    Dlg_import_xml.Execute()
+    Dlg_import_xml.dispose()  
+    
+    Sheet_organisation = ThisComponent.Sheets.getByIndex(0)
+    cell_checkbox = Sheet_organisation.getCellByPosition(2,11)
+    cell_checkbox.String="overwrite"    	
+End Sub
+
+Sub import_xml_organisation
+	''This Script calls BeanShell script to import xml export document
+	Dim iBox as Integer
+    Dim oSP as object
+    Dim oScript as object
+    Dim myArray(1) as String
+    Dim cell_save_path as object
+    Dim txt_path as object	
+    
+	iBox = MB_YESNO + MB_DEFBUTTON2 + MB_ICONQUESTION
+
+	If MsgBox ("Εκτελώντας τη συγχώνευση οργανικών μονάδων υπάρχει η περίπτωση αλλοίωσης του οργανοδιαγράμματος. Συνέχεια ;",  292) = 6 Then
+	    txt_path = Dlg_import_xml.getControl("txt_path")
+	    ''create path settings
+	    Sheet_settings = ThisComponent.Sheets.getByIndex(0)
+	    cell_save_path = Sheet_settings.getCellByPosition(2,10)
+	    cell_save_path.String = txt_path.Text       
+	    const PATH_TO_SCRIPT = "vnd.sun.star.script:xml_script.import_xml.bsh?language=BeanShell&location=document"
+	    oSP    = ThisComponent.getScriptProvider("")
+	    oScript = oSP.getScript(PATH_TO_SCRIPT)
+	    'For invoking scripts with arguments, see: http://api.openoffice.org/docs/common/ref/com/sun/star/script/provider/XScript.html
+	    'Also for Beanshell integration with Basic: http://user.services.openoffice.org/en/forum/viewtopic.php?f=21&t=4351
+	    myArray(0) = txt_path.Text
+	    ConvertFormula2Latex = oScript.invoke(Array(txt_path.Text), Array(), Array()) 
+		MsgBox "Η εισαγωγή του οργανογράμματος πραγματοποιήθηκε με επιτυχία!" 
+	Else
+		MsgBox "Η εισαγωγή του οργανογράμματος ακυρώθηκε!" 
+	End IF
+	
+
+
+End Sub
+
+Sub update_export_cell
+
+    dim update_mode as object
+    Sheet_settings = ThisComponent.Sheets.getByIndex(0)
+    update_mode = Dlg_import_xml.getControl("chkMearg")
+    Sheet_organisation = ThisComponent.Sheets.getByIndex(0)
+    cell_checkbox = Sheet_organisation.getCellByPosition(2,11)
+    if(update_mode.State=1) THEN
+    	cell_checkbox.String="append"
+    ELSE
+    	cell_checkbox.String="overwrite"
+    END IF
+	
+End Sub
+
+

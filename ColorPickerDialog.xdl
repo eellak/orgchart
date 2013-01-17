@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dlg:window PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "dialog.dtd">
+<dlg:window xmlns:dlg="http://openoffice.org/2000/dialog" xmlns:script="http://openoffice.org/2000/script" dlg:id="ColorPickerDialog" dlg:left="217" dlg:top="128" dlg:width="172" dlg:height="175" dlg:closeable="true" dlg:moveable="true" dlg:title="Επιλογή χρώματος φόντου">
+ <dlg:styles>
+  <dlg:style dlg:style-id="0" dlg:background-color="0x0" dlg:border="3d"/>
+  <dlg:style dlg:style-id="1" dlg:background-color="0xffffff" dlg:border="simple"/>
+  <dlg:style dlg:style-id="2" dlg:background-color="0xc0c0c0" dlg:border="simple"/>
+  <dlg:style dlg:style-id="3" dlg:background-color="0x808080" dlg:border="simple"/>
+  <dlg:style dlg:style-id="4" dlg:background-color="0x0" dlg:border="simple"/>
+  <dlg:style dlg:style-id="5" dlg:background-color="0x800000" dlg:border="simple"/>
+  <dlg:style dlg:style-id="6" dlg:background-color="0x808000" dlg:border="simple"/>
+  <dlg:style dlg:style-id="7" dlg:background-color="0xffff00" dlg:border="simple"/>
+  <dlg:style dlg:style-id="8" dlg:background-color="0x8000" dlg:border="simple"/>
+  <dlg:style dlg:style-id="9" dlg:background-color="0x9966cc" dlg:border="simple"/>
+  <dlg:style dlg:style-id="10" dlg:background-color="0xff9966" dlg:border="simple"/>
+  <dlg:style dlg:style-id="11" dlg:background-color="0xffff99" dlg:border="simple"/>
+  <dlg:style dlg:style-id="12" dlg:background-color="0x23b8dc" dlg:border="simple"/>
+  <dlg:style dlg:style-id="13" dlg:background-color="0x80" dlg:border="simple"/>
+  <dlg:style dlg:style-id="14" dlg:background-color="0xff" dlg:border="simple"/>
+  <dlg:style dlg:style-id="15" dlg:background-color="0x3deb3d" dlg:border="simple"/>
+  <dlg:style dlg:style-id="16" dlg:background-color="0xcccc" dlg:border="simple"/>
+ </dlg:styles>
+ <dlg:bulletinboard>
+  <dlg:button dlg:id="CommandButton1" dlg:tab-index="0" dlg:left="5" dlg:top="151" dlg:width="84" dlg:height="16" dlg:value="Ακύρωση" dlg:button-type="cancel"/>
+  <dlg:scrollbar dlg:id="OptionRedBar" dlg:tab-index="1" dlg:left="99" dlg:top="28" dlg:width="12" dlg:height="110" dlg:align="vertical" dlg:pageincrement="16" dlg:curpos="0" dlg:maxpos="255">
+   <script:event script:event-name="on-mousedrag" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.ChangeRGBColorToColorPickerButton?language=Basic&amp;location=document" script:language="Script"/>
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.ChangeRGBColorToColorPickerButton?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:scrollbar>
+  <dlg:titledbox dlg:id="FrameControl1" dlg:tab-index="4" dlg:left="3" dlg:top="5" dlg:width="89" dlg:height="119">
+   <dlg:title dlg:value="Με απευθείας επιλογή"/>
+  </dlg:titledbox>
+  <dlg:titledbox dlg:id="FrameControl2" dlg:tab-index="5" dlg:left="95" dlg:top="5" dlg:width="66" dlg:height="165">
+   <dlg:title dlg:value="Με χρωματικό κώδικα"/>
+  </dlg:titledbox>
+  <dlg:scrollbar dlg:id="OptionGreenBar" dlg:tab-index="2" dlg:left="121" dlg:top="28" dlg:width="12" dlg:height="110" dlg:align="vertical" dlg:pageincrement="16" dlg:curpos="0" dlg:maxpos="255">
+   <script:event script:event-name="on-mousedrag" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.ChangeRGBColorToColorPickerButton?language=Basic&amp;location=document" script:language="Script"/>
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.ChangeRGBColorToColorPickerButton?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:scrollbar>
+  <dlg:scrollbar dlg:id="OptionBlueBar" dlg:tab-index="3" dlg:left="144" dlg:top="28" dlg:width="12" dlg:height="110" dlg:align="vertical" dlg:pageincrement="16" dlg:curpos="0" dlg:maxpos="255">
+   <script:event script:event-name="on-mousedrag" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.ChangeRGBColorToColorPickerButton?language=Basic&amp;location=document" script:language="Script"/>
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.ChangeRGBColorToColorPickerButton?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:scrollbar>
+  <dlg:text dlg:id="Label1" dlg:tab-index="6" dlg:left="97" dlg:top="17" dlg:width="23" dlg:height="12" dlg:value="Κόκκινο"/>
+  <dlg:text dlg:id="Label2" dlg:tab-index="7" dlg:left="144" dlg:top="17" dlg:width="13" dlg:height="12" dlg:value="Μπλε"/>
+  <dlg:text dlg:id="Label3" dlg:tab-index="8" dlg:left="119" dlg:top="17" dlg:width="22" dlg:height="12" dlg:value="Πράσινο"/>
+  <dlg:text dlg:style-id="0" dlg:id="OptionColorPicker" dlg:tab-index="9" dlg:left="99" dlg:top="143" dlg:width="56" dlg:height="22">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByRGBColorCode?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:text>
+  <dlg:textfield dlg:style-id="1" dlg:id="LblColor1" dlg:tab-index="10" dlg:left="6" dlg:top="19" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="2" dlg:id="LblColor2" dlg:tab-index="11" dlg:left="28" dlg:top="19" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="3" dlg:id="LblColor3" dlg:tab-index="12" dlg:left="49" dlg:top="19" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="4" dlg:id="LblColor4" dlg:tab-index="13" dlg:left="70" dlg:top="19" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="5" dlg:id="LblColor5" dlg:tab-index="14" dlg:left="6" dlg:top="45" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="6" dlg:id="LblColor6" dlg:tab-index="15" dlg:left="28" dlg:top="45" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="7" dlg:id="LblColor7" dlg:tab-index="16" dlg:left="49" dlg:top="45" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="8" dlg:id="LblColor8" dlg:tab-index="17" dlg:left="70" dlg:top="45" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="9" dlg:id="LblColor9" dlg:tab-index="18" dlg:left="6" dlg:top="70" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="10" dlg:id="LblColor10" dlg:tab-index="19" dlg:left="28" dlg:top="70" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="11" dlg:id="LblColor11" dlg:tab-index="20" dlg:left="49" dlg:top="70" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="12" dlg:id="LblColor12" dlg:tab-index="21" dlg:left="70" dlg:top="70" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="13" dlg:id="LblColor13" dlg:tab-index="22" dlg:left="6" dlg:top="96" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="14" dlg:id="LblColor14" dlg:tab-index="23" dlg:left="28" dlg:top="96" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="15" dlg:id="LblColor15" dlg:tab-index="24" dlg:left="49" dlg:top="96" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+  <dlg:textfield dlg:style-id="16" dlg:id="LblColor16" dlg:tab-index="25" dlg:left="70" dlg:top="96" dlg:width="17" dlg:height="21">
+   <script:event script:event-name="on-mousedown" script:macro-name="vnd.sun.star.script:Standard.DrawingOrganisationChart.PickColorByDirectSelection?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:textfield>
+ </dlg:bulletinboard>
+</dlg:window>

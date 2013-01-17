@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dlg:window PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "dialog.dtd">
+<dlg:window xmlns:dlg="http://openoffice.org/2000/dialog" xmlns:script="http://openoffice.org/2000/script" dlg:id="export_xml_dialog" dlg:left="155" dlg:top="44" dlg:width="201" dlg:height="164" dlg:closeable="true" dlg:moveable="true" dlg:title="Εξαγωγή οργανογράμματος ως αρχείο XML">
+ <dlg:bulletinboard>
+  <dlg:menulist dlg:id="lstOrgUnit" dlg:tab-index="0" dlg:left="8" dlg:top="19" dlg:width="84" dlg:height="89"/>
+  <dlg:menulist dlg:id="lstSelOrgUnit" dlg:tab-index="1" dlg:left="117" dlg:top="20" dlg:width="79" dlg:height="72"/>
+  <dlg:button dlg:id="cmdSave" dlg:tab-index="2" dlg:left="144" dlg:top="145" dlg:width="50" dlg:height="16" dlg:value="Αποθήκευση">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.create_xml_file?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+  <dlg:text dlg:id="Label1" dlg:tab-index="3" dlg:left="8" dlg:top="114" dlg:width="97" dlg:height="9" dlg:value="Διαδρομή αποθήκευσης αρχείου:"/>
+  <dlg:text dlg:id="Label2" dlg:tab-index="5" dlg:left="10" dlg:top="7" dlg:width="84" dlg:height="12" dlg:value="Οργανικές μονάδες:"/>
+  <dlg:text dlg:id="Label3" dlg:tab-index="6" dlg:left="117" dlg:top="7" dlg:width="79" dlg:height="12" dlg:value="Επιλεγμένες Οργανικές μονάδες" dlg:multiline="true" dlg:tabstop="true"/>
+  <dlg:button dlg:id="CommandButton1" dlg:tab-index="7" dlg:left="95" dlg:top="28" dlg:width="17" dlg:height="16" dlg:value="&gt;">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.export_xml_select_ou?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+  <dlg:textfield dlg:id="txt_path" dlg:tab-index="4" dlg:left="8" dlg:top="124" dlg:width="186" dlg:height="12"/>
+  <dlg:button dlg:id="cmdClearList" dlg:tab-index="8" dlg:left="123" dlg:top="95" dlg:width="64" dlg:height="14" dlg:value="Καθαρισμός λίστας">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.clear_list?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+  <dlg:button dlg:id="cmdMoveAllData" dlg:tab-index="9" dlg:left="95" dlg:top="49" dlg:width="17" dlg:height="16" dlg:value="&gt;&gt;">
+   <script:event script:event-name="on-performaction" script:macro-name="vnd.sun.star.script:Standard.OrganizationChart.move_all_items?language=Basic&amp;location=document" script:language="Script"/>
+  </dlg:button>
+ </dlg:bulletinboard>
+</dlg:window>
