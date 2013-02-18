@@ -9,12 +9,14 @@ orgchart
 
 license
 -------
-This software is licensed under the [European Union Public License][EUPL]. For more
-information, read the file ``LICENSE.pdf``.
+Το λογισμικό διανέμεται με την άδεια [European Union Public License][EUPL].
+Για περισσότερες πληροφορίες, δείτε το αρχείο ``LICENSE.pdf``.
 
 [EUPL]: http://joinup.ec.europa.eu/software/page/eupl/licence-eupl
 
 
 documentation
 -------------
-See the wiki for documentation.
+Η τεκμηρίωση του project συντηρείται στο [wiki][gwiki].
+
+[gwiki]: https://github.com/eellak/orgchart/wiki
